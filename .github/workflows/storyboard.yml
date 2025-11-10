@@ -1,0 +1,36 @@
+name: Capture Portal Storyboard
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 13 * * MON" # Every Monday at 13:00 UTC
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    env:
+      PORTAL_BASE_URL: https://portal.promosinkwall-e.com
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Capture storyboard screenshots
+        run: node scripts/capture-storyboard.js
+
+      - name: Upload storyboard artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: portal-storyboard
+          path: storyboard/
