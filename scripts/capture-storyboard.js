@@ -1,34 +1,40 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
-const path = require("path");
-const fs = require("fs/promises");
-const { chromium } = require("playwright");
+const fs = require('fs');
+const path = require('path');
+const { chromium } = require('playwright');
 
-const portalBaseUrl = process.env.PORTAL_BASE_URL || "https://portal.promosinkwall-e.com";
-const outputDir = path.resolve(process.cwd(), "storyboard");
+const BASE_URL = process.env.PORTAL_BASE_URL || 'https://customer-portal-plcebt9v3-promos-ink.vercel.app';
+const OUTPUT_DIR = path.resolve(process.cwd(), 'storyboard');
+const VIEWPORT = { width: 1440, height: 900 };
 
-const routes = [
-  { name: "overview", path: "/portal" },
-  { name: "inventory", path: "/portal/inventory" },
-  { name: "quotes", path: "/portal/quotes" },
-];
-
-async function ensureDir(dir) {
-  await fs.promises.mkdir(dir, { recursive: true });
+function ensureDir(dir) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
 }
 
 async function captureScreenshots() {
-  await ensureDir(outputDir);
+  ensureDir(OUTPUT_DIR);
+
+  const targets = [
+    { slug: 'overview', pathname: '/portal' },
+    { slug: 'catalog', pathname: '/portal/catalog' },
+    { slug: 'product-pc54', pathname: '/portal/catalog/PC54' },
+    { slug: 'projects', pathname: '/portal/projects' },
+    { slug: 'orders', pathname: '/portal/orders' },
+  ];
 
   const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const context = await browser.newContext({ viewport: VIEWPORT });
 
-  for (const route of routes) {
-    const url = `${portalBaseUrl}${route.path}`;
-    console.log(`Visiting ${url}`);
-    await page.goto(url, { waitUntil: "networkidle" });
-    await page.waitForTimeout(2000);
-    const filePath = path.join(outputDir, `${route.name}.png`);
+  for (const target of targets) {
+    const url = new URL(target.pathname, BASE_URL).toString();
+    console.log(`Capturing ${url}`);
+    const page = await context.newPage();
+    await page.goto(url, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1500);
+    const filePath = path.join(OUTPUT_DIR, `${target.slug}.png`);
     await page.screenshot({ path: filePath, fullPage: true });
+    await page.close();
     console.log(`Saved ${filePath}`);
   }
 
@@ -36,6 +42,6 @@ async function captureScreenshots() {
 }
 
 captureScreenshots().catch((error) => {
-  console.error("Storyboard capture failed", error);
-  process.exit(1);
+  console.error('Storyboard capture failed', error);
+  process.exitCode = 1;
 });
