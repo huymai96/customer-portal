@@ -149,9 +149,10 @@ function normalizeProduct(record: UnknownRecord): NormalizedProduct | null {
     .map((entry) => readString(entry) ?? null)
     .filter((entry): entry is string => Boolean(entry));
 
-  const attributeEntries = toArray<UnknownRecord>(
+  const rawAttributes = (
     record.attributes ?? record.Attributes ?? record.attribute ?? record.Attribute
-  );
+  ) as UnknownRecord | UnknownRecord[] | null | undefined;
+  const attributeEntries = toArray<UnknownRecord>(rawAttributes);
   const attributes: Record<string, string> = {};
   for (const attr of attributeEntries) {
     const key =
