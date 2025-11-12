@@ -18,6 +18,7 @@ interface WarehouseQty {
 
 interface InventoryAggregate {
   supplierPartId: string;
+  colorName: string;
   colorCode: string;
   sizeCode: string;
   totalQty: number;
@@ -65,6 +66,7 @@ export async function importSanmarDipInventory(options: ImportDipOptions) {
         const key = `${supplierPartId.toUpperCase()}::${colorCode}::${sizeCode}`;
         const entry = aggregates.get(key) ?? {
           supplierPartId: supplierPartId.toUpperCase(),
+          colorName,
           colorCode,
           sizeCode,
           totalQty: 0,
@@ -88,37 +90,76 @@ export async function importSanmarDipInventory(options: ImportDipOptions) {
   const supplierPartIds = Array.from(new Set(entries.map((entry) => entry.supplierPartId)));
   const products = await prisma.product.findMany({
     where: { supplierPartId: { in: supplierPartIds } },
-    select: { id: true, supplierPartId: true },
+    select: {
+      id: true,
+      supplierPartId: true,
+      colors: { select: { colorCode: true, colorName: true } },
+    },
   });
   const productMap = new Map(products.map((product) => [product.supplierPartId, product.id]));
+  const colorLookup = new Map<string, Map<string, string>>();
+  for (const product of products) {
+    const map = new Map<string, string>();
+    for (const color of product.colors) {
+      if (!color.colorName) continue;
+      for (const key of buildKeyVariants(color.colorName)) {
+        if (!map.has(key)) {
+          map.set(key, color.colorCode);
+        }
+      }
+    }
+    colorLookup.set(product.supplierPartId, map);
+  }
 
-  const data = entries.map((entry) => {
-    const warehousesPayload =
-      entry.warehouses.length > 0 ? (entry.warehouses as unknown as Prisma.JsonArray) : undefined;
-
-    const base = {
-      supplierPartId: entry.supplierPartId,
-      colorCode: entry.colorCode,
-      sizeCode: entry.sizeCode,
-      totalQty: entry.totalQty,
-      warehouses: warehousesPayload,
-      fetchedAt,
-    } as {
+  const aggregated = new Map<
+    string,
+    {
       supplierPartId: string;
       colorCode: string;
       sizeCode: string;
       totalQty: number;
-      warehouses?: Prisma.JsonArray;
+      warehouses: Map<string, number>;
       fetchedAt: Date;
       productId?: string;
-    };
-
-    const productId = productMap.get(entry.supplierPartId);
-    if (productId) {
-      base.productId = productId;
     }
-    return base;
-  });
+  >();
+
+  for (const entry of entries) {
+    const productId = productMap.get(entry.supplierPartId);
+    const colorCode = resolveColorCode(entry, colorLookup.get(entry.supplierPartId));
+    const key = `${entry.supplierPartId}::${colorCode}::${entry.sizeCode}`;
+    const record =
+      aggregated.get(key) ?? {
+        supplierPartId: entry.supplierPartId,
+        colorCode,
+        sizeCode: entry.sizeCode,
+        totalQty: 0,
+        warehouses: new Map<string, number>(),
+        fetchedAt,
+        productId,
+      };
+
+    record.totalQty += entry.totalQty;
+    for (const warehouse of entry.warehouses) {
+      const existingQty = record.warehouses.get(warehouse.warehouseId) ?? 0;
+      record.warehouses.set(warehouse.warehouseId, existingQty + warehouse.quantity);
+    }
+
+    aggregated.set(key, record);
+  }
+
+  const data = Array.from(aggregated.values()).map((record) => ({
+    supplierPartId: record.supplierPartId,
+    colorCode: record.colorCode,
+    sizeCode: record.sizeCode,
+    totalQty: record.totalQty,
+    warehouses: Array.from(record.warehouses.entries()).map(([warehouseId, quantity]) => ({
+      warehouseId,
+      quantity,
+    })) as unknown as Prisma.JsonArray,
+    fetchedAt: record.fetchedAt,
+    productId: record.productId,
+  }));
 
   await prisma.productInventory.deleteMany({});
   if (data.length > 0) {
@@ -126,4 +167,43 @@ export async function importSanmarDipInventory(options: ImportDipOptions) {
   }
 
   return { processed: entries.length, created: entries.length };
+}
+
+function resolveColorCode(
+  entry: InventoryAggregate,
+  lookup: Map<string, string> | undefined
+) {
+  if (!lookup) {
+    return entry.colorCode;
+  }
+  for (const key of buildKeyVariants(entry.colorName)) {
+    const match = lookup.get(key);
+    if (match) {
+      return match;
+    }
+  }
+  return entry.colorCode;
+}
+
+function buildKeyVariants(name: string): string[] {
+  const trimmed = name.trim().toUpperCase();
+  const alnum = trimmed.replace(/[^A-Z0-9]/g, '');
+  const noVowels = alnum.replace(/[AEIOU]/g, '');
+  const deduped = dedupe(noVowels);
+  return [alnum, noVowels, deduped].filter(Boolean);
+}
+
+function dedupe(input: string): string {
+  if (!input) {
+    return input;
+  }
+  let result = '';
+  let previous = '';
+  for (const char of input) {
+    if (char !== previous) {
+      result += char;
+      previous = char;
+    }
+  }
+  return result;
 }
