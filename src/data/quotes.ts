@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { calculateLinePricing } from '@/lib/pricing';
 import { sendEmail } from '@/lib/email';
 import type { QuoteLineResponse, QuoteRequest, QuoteResponse } from '@/lib/types';
-import { getProductBaseBlankCost } from '@/data/catalog';
+import { getProductBaseBlankCost } from '@/services/catalog-repository';
 
 const quotes: QuoteResponse[] = [];
 
@@ -12,22 +12,24 @@ export async function createQuote(payload: QuoteRequest): Promise<QuoteResponse>
     throw new Error('Quote requires at least one line');
   }
 
-  const normalizedLines: QuoteLineResponse[] = payload.lines.map((line) => {
-    const baseBlankCost = getProductBaseBlankCost(line.supplierPartId) ?? undefined;
-    const pricing = calculateLinePricing({
-      supplierPartId: line.supplierPartId,
-      colorCode: line.colorCode,
-      sizeCode: line.sizeCode,
-      qty: line.qty,
-      decoration: line.decoration ?? null,
-      baseBlankCost,
-    });
+  const normalizedLines: QuoteLineResponse[] = await Promise.all(
+    payload.lines.map(async (line) => {
+      const baseBlankCost = await getProductBaseBlankCost(line.supplierPartId);
+      const pricing = calculateLinePricing({
+        supplierPartId: line.supplierPartId,
+        colorCode: line.colorCode,
+        sizeCode: line.sizeCode,
+        qty: line.qty,
+        decoration: line.decoration ?? null,
+        baseBlankCost: baseBlankCost ?? undefined,
+      });
 
-    return {
-      ...line,
-      pricing,
-    };
-  });
+      return {
+        ...line,
+        pricing,
+      };
+    })
+  );
 
   const subtotal = normalizedLines.reduce((sum, line) => sum + line.pricing.extendedPrice, 0);
   const quote: QuoteResponse = {

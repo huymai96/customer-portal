@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { getInventorySnapshot } from '@/data/catalog';
+export const runtime = 'nodejs';
+
+import { getSanmarInventorySnapshot } from '@/services/sanmar/inventory';
 
 export async function GET(
   request: NextRequest,
@@ -13,10 +15,12 @@ export async function GET(
     return NextResponse.json({ error: 'Missing color' }, { status: 400 });
   }
 
-  const snapshot = getInventorySnapshot(supplierPartId, colorCode);
-  if (!snapshot) {
-    return NextResponse.json({ error: 'Inventory not found' }, { status: 404 });
+  try {
+    const snapshot = await getSanmarInventorySnapshot(supplierPartId, colorCode);
+    return NextResponse.json(snapshot);
+  } catch (error) {
+    console.error('SanMar inventory fetch failed', error);
+    const message = error instanceof Error ? error.message : 'Inventory lookup failed';
+    return NextResponse.json({ error: message }, { status: 502 });
   }
-
-  return NextResponse.json(snapshot);
 }

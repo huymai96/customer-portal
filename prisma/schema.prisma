@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id               String            @id @default(uuid())
+  supplierPartId   String            @unique
+  name             String
+  brand            String?
+  defaultColor     String?
+  description      Json?
+  attributes       Json?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  colors           ProductColor[]
+  sizes            ProductSize[]
+  media            ProductMedia[]
+  skus             ProductSku[]
+  keywords         ProductKeyword[]
+
+  @@index([supplierPartId])
+}
+
+model ProductColor {
+  id                String   @id @default(uuid())
+  productId         String
+  colorCode         String
+  colorName         String?
+  supplierVariantId String?
+  swatchUrl         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, colorCode])
+  @@index([colorCode])
+}
+
+model ProductSize {
+  id        String   @id @default(uuid())
+  productId String
+  sizeCode  String
+  display   String?
+  sort      Int?
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, sizeCode])
+  @@index([sizeCode])
+}
+
+model ProductMedia {
+  id        String   @id @default(uuid())
+  productId String
+  colorCode String?
+  url       String
+  position  Int?
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, colorCode])
+}
+
+model ProductSku {
+  id          String   @id @default(uuid())
+  productId   String
+  colorCode   String
+  sizeCode    String
+  supplierSku String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, colorCode, sizeCode])
+  @@index([supplierSku])
+}
+
+model ProductKeyword {
+  id        String   @id @default(uuid())
+  productId String
+  keyword   String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, keyword])
+  @@index([keyword])
+}

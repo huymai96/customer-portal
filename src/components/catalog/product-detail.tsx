@@ -74,15 +74,36 @@ export function ProductDetail({ product }: ProductDetailProps) {
 
   const imagesByColor = useMemo(() => {
     const map = new Map<string, string[]>();
-    for (const media of product.media ?? []) {
-      const key = normalizeColorCode(media.colorCode);
-      const list = map.get(key) ?? [];
-      map.set(key, [...list, ...media.urls]);
-    }
-    return map;
-  }, [product.media]);
+    const fallbackKey = normalizeColorCode(product.defaultColor) || 'GLOBAL';
 
-  const activeImageSet = imagesByColor.get(activeColor) ?? imagesByColor.get(initialColorCode) ?? [];
+    const pushUrls = (key: string, urls: string[]) => {
+      const existing = map.get(key) ?? [];
+      map.set(key, [...existing, ...urls]);
+    };
+
+    for (const media of product.media ?? []) {
+      const validUrls = (media.urls ?? [])
+        .map((url) => url.trim())
+        .filter((url) => /^https?:\/\//i.test(url));
+      if (!validUrls.length) continue;
+
+      const key = normalizeColorCode(media.colorCode);
+      if (key) {
+        pushUrls(key, validUrls);
+      } else {
+        pushUrls(fallbackKey, validUrls);
+      }
+    }
+
+    return map;
+  }, [product.media, product.defaultColor]);
+
+  const activeImageSet =
+    imagesByColor.get(activeColor) ??
+    imagesByColor.get(normalizeColorCode(product.defaultColor)) ??
+    imagesByColor.get('GLOBAL') ??
+    imagesByColor.get(initialColorCode) ??
+    [];
 
   const { data: inventory, isLoading: inventoryLoading } = useSWR(
     debouncedColor ? ['inventory', product.supplierPartId, debouncedColor] : null,

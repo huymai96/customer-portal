@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { getProductBySupplierPartId } from '@/data/catalog';
+import { getProductBySupplierPartId } from '@/services/catalog-repository';
 
 export async function GET(
   _request: NextRequest,
@@ -8,7 +8,7 @@ export async function GET(
 ) {
   const { productId } = await context.params;
   const supplierPartId = decodeURIComponent(productId);
-  const product = getProductBySupplierPartId(supplierPartId);
+  const product = await getProductBySupplierPartId(supplierPartId);
   if (!product) {
     return NextResponse.json({ error: 'Product not found' }, { status: 404 });
   }

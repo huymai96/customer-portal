@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { listProducts, searchCatalog } from '@/data/catalog';
+import { listCatalogProducts, searchCatalogProducts } from '@/services/catalog-repository';
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
   const query = url.searchParams.get('query');
   if (query && query.trim().length > 0) {
-    const items = searchCatalog(query.trim());
+    const items = await searchCatalogProducts(query.trim());
     return NextResponse.json({ items });
   }
 
-  const products = listProducts();
+  const products = await listCatalogProducts();
   return NextResponse.json({ products });
 }

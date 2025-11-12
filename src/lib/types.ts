@@ -45,7 +45,7 @@ export interface ProductRecord {
 export type InventorySnapshot = {
   bySize: Record<string, InventoryQty>;
   fetchedAt: string;
-  cacheStatus?: 'hit' | 'db' | 'refreshed';
+  cacheStatus?: 'hit' | 'refreshed' | 'stale';
 };
 
 export type DecorationMethod = 'screen' | 'emb' | 'dtf' | 'heat';

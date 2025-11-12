@@ -43,3 +43,7 @@ next-env.d.ts
 .vercel
 node_modules/
 .env*
+
+.env*.local
+
+tmp/
