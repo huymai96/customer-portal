@@ -1,4 +1,4 @@
-import { PrismaClient, Product } from '@prisma/client';
+import { Prisma, PrismaClient, Product } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
 
@@ -190,7 +190,7 @@ function normalizeProduct(record: UnknownRecord): NormalizedProduct | null {
         swatchUrl: readString(color?.swatchUrl ?? color?.SwatchUrl ?? color?.swatch) ?? null,
       };
     })
-    .filter((entry): entry is NormalizedProduct['colors'][number] => Boolean(entry));
+    .filter(Boolean) as NormalizedProduct['colors'];
 
   const rawSizes = (
     record.sizes ?? record.Sizes ?? record.sizeChart ?? record.SizeChart ?? record.Size
@@ -209,7 +209,7 @@ function normalizeProduct(record: UnknownRecord): NormalizedProduct | null {
         sort: sortValue ?? null,
       };
     })
-    .filter((entry): entry is NormalizedProduct['sizes'][number] => Boolean(entry));
+    .filter(Boolean) as NormalizedProduct['sizes'];
 
   const rawMedia = (
     record.media ?? record.Media ?? record.images ?? record.Images ?? record.image ?? record.Image
@@ -276,7 +276,7 @@ function normalizeProduct(record: UnknownRecord): NormalizedProduct | null {
       }
       return { colorCode, sizeCode, supplierSku };
     })
-    .filter((entry): entry is NormalizedProduct['skus'][number] => Boolean(entry));
+    .filter(Boolean) as NormalizedProduct['skus'];
 
   const rawKeywords = (
     record.keywords ??
@@ -337,11 +337,17 @@ function extractNextCursor(payload: PromoStandardsCatalogResponse, currentPage: 
     return null;
   }
 
+  const pageInfoRecord = (pageInfo ?? {}) as Record<string, unknown>;
   const nextPageCandidate =
-    pageInfo.nextPage ?? pageInfo.NextPage ?? (pageInfo.pageNumber ?? pageInfo.PageNumber);
+    pageInfoRecord.nextPage ??
+    pageInfoRecord.NextPage ??
+    pageInfoRecord.pageNumber ??
+    pageInfoRecord.PageNumber;
 
   const nextPage = readNumber(nextPageCandidate ?? currentPage + 1);
-  const totalPages = readNumber(pageInfo.totalPages ?? pageInfo.TotalPages);
+  const totalPages = readNumber(
+    pageInfoRecord.totalPages ?? pageInfoRecord.TotalPages ?? pageInfoRecord.TotalPage
+  );
 
   if (!nextPage || (totalPages && nextPage > totalPages)) {
     return null;
@@ -426,7 +432,10 @@ async function fetchCatalogPage(
   };
 }
 
-async function upsertProduct(tx: PrismaClient, product: NormalizedProduct): Promise<'created' | 'updated'> {
+async function upsertProduct(
+  tx: PrismaClient | Prisma.TransactionClient,
+  product: NormalizedProduct
+): Promise<'created' | 'updated'> {
   const existing = await tx.product.findUnique({
     where: { supplierPartId: product.supplierPartId },
     select: { id: true },

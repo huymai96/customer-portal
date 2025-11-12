@@ -1,6 +1,7 @@
 import { createReadStream } from 'fs';
 import path from 'path';
 import { parse } from 'csv-parse';
+import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
 
@@ -142,13 +143,22 @@ export async function importSanmarCatalog(options: ImportOptions): Promise<Impor
         select: { id: true },
       });
 
+      const descriptionJson =
+        accumulator.description.length > 0
+          ? (accumulator.description as unknown as Prisma.JsonArray)
+          : undefined;
+      const attributesJson =
+        Object.keys(accumulator.attributes).length > 0
+          ? (accumulator.attributes as unknown as Prisma.JsonObject)
+          : undefined;
+
       const data = {
         supplierPartId: accumulator.supplierPartId,
         name: accumulator.name,
         brand: accumulator.brand ?? null,
         defaultColor: accumulator.defaultColor ?? null,
-        description: accumulator.description,
-        attributes: accumulator.attributes,
+        description: descriptionJson,
+        attributes: attributesJson,
       };
 
       const product = existing

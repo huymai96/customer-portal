@@ -1,6 +1,7 @@
 import { createReadStream } from 'fs';
 import path from 'path';
 import { parse } from 'csv-parse';
+import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
 import { sanitizeCode, parseDecimal } from '@/services/sanmar/importer';
@@ -92,19 +93,22 @@ export async function importSanmarDipInventory(options: ImportDipOptions) {
   const productMap = new Map(products.map((product) => [product.supplierPartId, product.id]));
 
   const data = entries.map((entry) => {
+    const warehousesPayload =
+      entry.warehouses.length > 0 ? (entry.warehouses as unknown as Prisma.JsonArray) : undefined;
+
     const base = {
       supplierPartId: entry.supplierPartId,
       colorCode: entry.colorCode,
       sizeCode: entry.sizeCode,
       totalQty: entry.totalQty,
-      warehouses: entry.warehouses,
+      warehouses: warehousesPayload,
       fetchedAt,
     } as {
       supplierPartId: string;
       colorCode: string;
       sizeCode: string;
       totalQty: number;
-      warehouses: WarehouseQty[];
+      warehouses?: Prisma.JsonArray;
       fetchedAt: Date;
       productId?: string;
     };

@@ -1,6 +1,6 @@
 import { mkdir } from 'fs/promises';
 import path from 'path';
-import SftpClient, { FastGetOptions } from 'ssh2-sftp-client';
+import SftpClient from 'ssh2-sftp-client';
 
 export interface SanmarSftpConfig {
   host: string;
@@ -49,7 +49,7 @@ export async function downloadSanmarFiles(options: DownloadOptions, config = get
     });
 
     const remoteBase = config.remoteDir?.length ? `${config.remoteDir}`.replace(/\/+$/u, '') : '';
-    const fastGetOptions: FastGetOptions = { concurrency: 4 };
+    const fastGetOptions = { concurrency: 4 };
 
     for (const file of options.files) {
       const remotePath = remoteBase ? `${remoteBase}/${file}` : file;

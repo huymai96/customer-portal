@@ -2,11 +2,18 @@ import { kv } from '@vercel/kv';
 
 import { prisma } from '@/lib/prisma';
 import type { InventorySnapshot, InventoryQty } from '@/lib/types';
-import { requireEnv } from '@/lib/utils';
 
 const CACHE_PREFIX = 'sanmar:inventory';
 const DEFAULT_TTL = Number.parseInt(process.env.SANMAR_INVENTORY_CACHE_TTL ?? '60', 10);
 const DEFAULT_ENDPOINT = 'https://ws.sanmar.com/ps/api/v2/inventory/GetInventoryAvailability';
+
+function requireEnv(key: string): string {
+  const value = process.env[key];
+  if (!value || value.length === 0) {
+    throw new Error(`Environment variable ${key} is required`);
+  }
+  return value;
+}
 
 interface UpstreamInventoryRow {
   size?: string;
