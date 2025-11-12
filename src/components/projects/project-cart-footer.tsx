@@ -170,15 +170,6 @@ export function ProjectCartFooter() {
                 }
                 setAddressVerified(true);
               }}
-              onAddressResolved={(parsed) => {
-                setAddress1(parsed.line1 ?? '');
-                setCity(parsed.city ?? '');
-                setRegion(parsed.state ?? '');
-                setPostalCode(parsed.postalCode ?? '');
-                if (parsed.country) {
-                  setCountry(parsed.country);
-                }
-              }}
               placeholder="Start typing for Google-verified matches"
             />
           </label>
