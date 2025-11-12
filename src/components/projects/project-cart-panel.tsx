@@ -190,7 +190,10 @@ export function ProjectCartPanel() {
   }
 
   return (
-    <aside className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <aside
+      id="project-cart-panel"
+      className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+    >
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-900">Project Cart</h2>
         <button

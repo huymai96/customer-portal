@@ -50,6 +50,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showDecorationPrompt, setShowDecorationPrompt] = useState(false);
 
   const skuLookup = useMemo(() => {
     const lookup = new Map<string, string | null>();
@@ -176,6 +177,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
     event.preventDefault();
     setStatusMessage(null);
     setErrorMessage(null);
+    setShowDecorationPrompt(false);
 
     const entries = Object.entries(quantities)
       .map(([sizeCode, value]) => ({
@@ -218,9 +220,22 @@ export function ProductDetail({ product }: ProductDetailProps) {
 
     clearForm();
     setStatusMessage('Added to project cart.');
+    setShowDecorationPrompt(true);
   };
 
   const colorName = colorDisplayName(colorways, activeColor);
+
+  const handleProceedToDecoration = () => {
+    setShowDecorationPrompt(false);
+    const panel = document.getElementById('project-cart-panel');
+    if (panel) {
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      panel.classList.add('ring-2', 'ring-brand-500');
+      window.setTimeout(() => {
+        panel.classList.remove('ring-2', 'ring-brand-500');
+      }, 1800);
+    }
+  };
 
   return (
     <div className="stack-2xl">
@@ -279,6 +294,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
                       setQuantities({});
                       setStatusMessage(null);
                       setErrorMessage(null);
+                      setShowDecorationPrompt(false);
                     }}
                     className={clsx(
                       'rounded-full border px-4 py-2 text-sm transition',
@@ -378,11 +394,39 @@ export function ProductDetail({ product }: ProductDetailProps) {
                 {errorMessage ? <p className="text-sm text-rose-500">{errorMessage}</p> : null}
                 {statusMessage ? <p className="text-sm text-emerald-600">{statusMessage}</p> : null}
 
+                {showDecorationPrompt ? (
+                  <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-700">
+                    <p className="font-medium">Ready to keep staging or start decoration?</p>
+                    <p className="mt-1 text-brand-600">
+                      You can add more sizes or colors, or jump ahead to add decoration instructions.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowDecorationPrompt(false)}
+                        className="rounded-full border border-brand-200 px-4 py-2 text-xs font-semibold text-brand-700 hover:border-brand-300"
+                      >
+                        Add more SKUs
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleProceedToDecoration}
+                        className="rounded-full bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-700"
+                      >
+                        Go to Decoration
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-xs text-slate-500">We validate quantities against live inventory before staging.</p>
                   <button
                     type="submit"
-                    className="rounded-full bg-brand-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+                    className={clsx(
+                      'w-full rounded-full bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm',
+                      showDecorationPrompt ? 'bg-brand-700' : 'hover:bg-brand-700'
+                    )}
                   >
                     Add to project cart
                   </button>

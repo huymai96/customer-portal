@@ -25,6 +25,7 @@ export function ProjectCartFooter() {
   const [region, setRegion] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [country, setCountry] = useState(INITIAL_COUNTRY);
+  const [addressVerified, setAddressVerified] = useState(false);
   const [needBy, setNeedBy] = useState('');
   const [notes, setNotes] = useState('');
   const [proofRequested, setProofRequested] = useState(false);
@@ -83,6 +84,7 @@ export function ProjectCartFooter() {
       setNeedBy('');
       setNotes('');
       setProofRequested(false);
+      setAddressVerified(false);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to submit quote';
       setError(message);
@@ -139,10 +141,25 @@ export function ProjectCartFooter() {
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="stack-xs md:col-span-2">
-            <span className="text-xs font-semibold uppercase text-slate-500">Address</span>
+            <span className="flex items-center justify-between text-xs font-semibold uppercase text-slate-500">
+              <span>Address</span>
+              <span
+                className={clsx(
+                  'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                  addressVerified
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-slate-200 text-slate-600'
+                )}
+              >
+                {addressVerified ? 'Google verified' : 'Awaiting verification'}
+              </span>
+            </span>
             <AddressAutocomplete
               value={address1}
-              onChange={setAddress1}
+              onChange={(next) => {
+                setAddress1(next);
+                setAddressVerified(false);
+              }}
               onAddressResolved={(parsed) => {
                 setAddress1(parsed.line1 ?? '');
                 setCity(parsed.city ?? '');
@@ -151,6 +168,7 @@ export function ProjectCartFooter() {
                 if (parsed.country) {
                   setCountry(parsed.country);
                 }
+                setAddressVerified(true);
               }}
               placeholder="Start typing for Google-verified matches"
             />

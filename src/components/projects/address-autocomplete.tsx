@@ -17,6 +17,11 @@ interface AddressAutocompleteProps {
 }
 
 const loaderCache = new Map<string, Loader>();
+const countriesEnv = process.env.NEXT_PUBLIC_GOOGLE_AUTOCOMPLETE_COUNTRIES;
+const defaultCountries = countriesEnv
+  ?.split(',')
+  .map((entry) => entry.trim().toLowerCase())
+  .filter(Boolean);
 
 function getLoader(apiKey: string) {
   const cached = loaderCache.get(apiKey);
@@ -97,8 +102,12 @@ export function AddressAutocomplete({
           return;
         }
         autocomplete = new maps.places.Autocomplete(inputRef.current, {
-          componentRestrictions: { country: ['us', 'ca'] },
+          componentRestrictions:
+            defaultCountries && defaultCountries.length > 0
+              ? { country: defaultCountries }
+              : undefined,
           fields: ['address_components', 'formatted_address'],
+          types: ['address'],
         });
 
         autocomplete.addListener('place_changed', () => {

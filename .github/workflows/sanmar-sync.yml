@@ -1,0 +1,43 @@
+name: Sync SanMar Catalog
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SANMAR_FTP_HOST: ${{ secrets.SANMAR_FTP_HOST }}
+      SANMAR_FTP_PORT: ${{ secrets.SANMAR_FTP_PORT }}
+      SANMAR_FTP_USERNAME: ${{ secrets.SANMAR_FTP_USERNAME }}
+      SANMAR_FTP_PASSWORD: ${{ secrets.SANMAR_FTP_PASSWORD }}
+      SANMAR_FTP_REMOTE_DIR: ${{ secrets.SANMAR_FTP_REMOTE_DIR }}
+      SANMAR_FTP_FILES: ${{ secrets.SANMAR_FTP_FILES }}
+      SANMAR_ACCOUNT_NUMBER: ${{ secrets.SANMAR_ACCOUNT_NUMBER }}
+      SANMAR_PROMOSTANDARDS_USERNAME: ${{ secrets.SANMAR_PROMOSTANDARDS_USERNAME }}
+      SANMAR_PROMOSTANDARDS_PASSWORD: ${{ secrets.SANMAR_PROMOSTANDARDS_PASSWORD }}
+      SANMAR_PROMOSTANDARDS_URL: ${{ secrets.SANMAR_PROMOSTANDARDS_URL }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download SanMar files via SFTP
+        run: npm run download:sanmar-ftp
+
+      - name: Ingest SanMar catalog CSV data
+        run: npm run ingest:sanmar-local
+
+      - name: Ingest SanMar inventory snapshot
+        run: npm run ingest:sanmar-inventory
