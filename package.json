@@ -11,7 +11,8 @@
     "prisma:migrate": "prisma migrate deploy",
     "sync:sanmar-catalog": "tsx scripts/sync-sanmar-catalog.ts",
     "download:sanmar-ftp": "tsx scripts/download-sanmar-ftp.ts",
-    "ingest:sanmar-local": "tsx scripts/ingest-sanmar-local.ts"
+    "ingest:sanmar-local": "tsx scripts/ingest-sanmar-local.ts",
+    "ingest:sanmar-inventory": "tsx scripts/ingest-sanmar-inventory.ts"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.12.0",

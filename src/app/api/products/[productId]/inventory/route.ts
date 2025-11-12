@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
-import { getSanmarInventorySnapshot } from '@/services/sanmar/inventory';
+import { getSanmarInventorySnapshot, getStoredInventorySnapshot } from '@/services/sanmar/inventory';
 
 export async function GET(
   request: NextRequest,
@@ -20,6 +20,16 @@ export async function GET(
     return NextResponse.json(snapshot);
   } catch (error) {
     console.error('SanMar inventory fetch failed', error);
+
+    try {
+      const fallback = await getStoredInventorySnapshot(supplierPartId, colorCode);
+      if (fallback) {
+        return NextResponse.json(fallback);
+      }
+    } catch (fallbackError) {
+      console.error('Stored inventory fallback failed', fallbackError);
+    }
+
     const message = error instanceof Error ? error.message : 'Inventory lookup failed';
     return NextResponse.json({ error: message }, { status: 502 });
   }

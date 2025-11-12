@@ -57,7 +57,7 @@ export interface ImportResult {
 
 const NUMBER_REGEX = /-?[0-9]+(?:\.[0-9]+)?/u;
 
-function sanitizeCode(input: string, fallback: string): string {
+export function sanitizeCode(input: string, fallback: string): string {
   const normalized = input
     .normalize('NFKD')
     .replace(/[^a-zA-Z0-9]+/gu, '_')
@@ -75,7 +75,7 @@ function splitDescription(raw: string | null | undefined): string[] {
     .filter((entry) => entry.length > 0);
 }
 
-function parseDecimal(input: string | null | undefined): number | null {
+export function parseDecimal(input: string | null | undefined): number | null {
   if (!input) return null;
   const sanitized = input.replace(/[^0-9.,-]/gu, '').replace(/,/gu, '');
   const match = NUMBER_REGEX.exec(sanitized);

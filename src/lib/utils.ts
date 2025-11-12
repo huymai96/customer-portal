@@ -12,3 +12,11 @@ export function formatCurrency(amount?: number | string | null, currency = "USD"
     return numeric.toFixed(2);
   }
 }
+
+export function requireEnv(key: string): string {
+  const value = process.env[key];
+  if (!value || value.length === 0) {
+    throw new Error(`Environment variable ${key} is required`);
+  }
+  return value;
+}

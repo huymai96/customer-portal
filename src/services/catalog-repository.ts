@@ -1,7 +1,14 @@
 import type { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
-import type { ProductRecord, ProductMediaGroup, ProductSize, ProductColorway, ProductSkuMapEntry } from '@/lib/types';
+import type {
+  ProductRecord,
+  ProductMediaGroup,
+  ProductSize,
+  ProductColorway,
+  ProductSkuMapEntry,
+  ProductInventorySummary,
+} from '@/lib/types';
 
 type PrismaProduct = Prisma.ProductGetPayload<{
   include: {
@@ -10,6 +17,7 @@ type PrismaProduct = Prisma.ProductGetPayload<{
     media: true;
     skus: true;
     keywords: true;
+    inventory: true;
   };
 }>;
 
@@ -54,6 +62,14 @@ function mapProduct(product: PrismaProduct): ProductRecord {
     supplierSku: sku.supplierSku,
   }));
 
+  const inventory: ProductInventorySummary[] | undefined = product.inventory?.map((entry) => ({
+    colorCode: entry.colorCode,
+    sizeCode: entry.sizeCode,
+    totalQty: entry.totalQty,
+    fetchedAt: entry.fetchedAt.toISOString(),
+    warehouses: Array.isArray(entry.warehouses) ? (entry.warehouses as Array<{ warehouseId: string; quantity: number }>) : undefined,
+  }));
+
   return {
     id: product.id,
     supplierPartId: product.supplierPartId,
@@ -66,6 +82,7 @@ function mapProduct(product: PrismaProduct): ProductRecord {
     skuMap,
     description: Array.isArray(product.description) ? (product.description as string[]) : [],
     attributes: product.attributes ?? undefined,
+    inventory,
   };
 }
 
@@ -73,7 +90,7 @@ export async function listCatalogProducts(limit = 50): Promise<ProductRecord[]> 
   const products = await prisma.product.findMany({
     take: limit,
     orderBy: { supplierPartId: 'asc' },
-    include: { colors: true, sizes: true, media: true, skus: true, keywords: true },
+    include: { colors: true, sizes: true, media: true, skus: true, keywords: true, inventory: true },
   });
   return products.map(mapProduct);
 }
@@ -112,7 +129,7 @@ export async function searchCatalogProducts(query: string, limit = 20) {
 export async function getProductBySupplierPartId(partId: string): Promise<ProductRecord | null> {
   const product = await prisma.product.findUnique({
     where: { supplierPartId: partId.toUpperCase() },
-    include: { colors: true, sizes: true, media: true, skus: true, keywords: true },
+    include: { colors: true, sizes: true, media: true, skus: true, keywords: true, inventory: true },
   });
 
   return product ? mapProduct(product) : null;

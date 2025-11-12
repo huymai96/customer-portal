@@ -22,6 +22,7 @@ model Product {
   media            ProductMedia[]
   skus             ProductSku[]
   keywords         ProductKeyword[]
+  inventory        ProductInventory[]
 
   @@index([supplierPartId])
 }
@@ -84,4 +85,20 @@ model ProductKeyword {
 
   @@unique([productId, keyword])
   @@index([keyword])
+}
+
+model ProductInventory {
+  id              String   @id @default(uuid())
+  productId       String?
+  supplierPartId  String
+  colorCode       String
+  sizeCode        String
+  totalQty        Int
+  warehouses      Json?
+  fetchedAt       DateTime
+  updatedAt       DateTime @updatedAt
+  product         Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierPartId, colorCode, sizeCode])
+  @@index([supplierPartId])
 }

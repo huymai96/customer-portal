@@ -105,6 +105,18 @@ export function ProductDetail({ product }: ProductDetailProps) {
     imagesByColor.get(initialColorCode) ??
     [];
 
+  const dipInventoryByColor = useMemo(() => {
+    const map = new Map<string, Map<string, number>>();
+    for (const entry of product.inventory ?? []) {
+      const colorKey = normalizeColorCode(entry.colorCode);
+      const sizeKey = entry.sizeCode.toUpperCase();
+      const colorMap = map.get(colorKey) ?? new Map<string, number>();
+      colorMap.set(sizeKey, entry.totalQty);
+      map.set(colorKey, colorMap);
+    }
+    return map;
+  }, [product.inventory]);
+
   const { data: inventory, isLoading: inventoryLoading } = useSWR(
     debouncedColor ? ['inventory', product.supplierPartId, debouncedColor] : null,
     ([, supplierPartId, colorCode]) => fetchInventorySnapshot(supplierPartId, colorCode),
@@ -117,6 +129,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
 
   const sizeRows: SizeRow[] = useMemo(() => {
     const availableSizes = sizesByColor.get(activeColor) ?? new Set<string>();
+    const dipInventory = dipInventoryByColor.get(activeColor);
 
     return (product.sizes ?? []).map((size) => {
       const normalized = size.code.toUpperCase();
@@ -127,20 +140,26 @@ export function ProductDetail({ product }: ProductDetailProps) {
         inventory?.bySize?.[size.code] ??
         inventory?.bySize?.[size.code.toLowerCase()];
       const disabled = !availableSizes.has(normalized) || !supplierSku;
+      const dipQty = dipInventory?.get(normalized) ?? null;
+      const resolvedQty = availableEntry?.qty ?? dipQty;
 
       return {
         size,
         supplierSku,
         disabled,
-        available: disabled ? null : availableEntry?.qty ?? 0,
+        available: disabled ? null : resolvedQty ?? 0,
         backorderDate: availableEntry?.backorderDate,
       };
     });
-  }, [product.sizes, inventory, activeColor, skuLookup, sizesByColor]);
+  }, [product.sizes, inventory, activeColor, skuLookup, sizesByColor, dipInventoryByColor]);
 
   const totalAvailable = useMemo(() => {
     return sizeRows.reduce((sum, row) => sum + (row.available ?? 0), 0);
   }, [sizeRows]);
+
+  const hasDipInventory = useMemo(() => {
+    return (product.inventory ?? []).some((entry) => normalizeColorCode(entry.colorCode) === activeColor);
+  }, [product.inventory, activeColor]);
 
   const handleQuantityChange = (sizeCode: string, value: string) => {
     setQuantities((prev) => ({
@@ -291,9 +310,19 @@ export function ProductDetail({ product }: ProductDetailProps) {
 
             <div className="mt-6 space-y-4">
               <div className="flex items-center justify-between text-xs text-slate-400">
-                <p>{inventoryLoading ? 'Fetching live inventory…' : 'Live inventory snapshot'}</p>
+                <p>
+                  {inventoryLoading
+                    ? 'Fetching live inventory…'
+                    : inventory?.bySize
+                      ? 'Live inventory snapshot'
+                      : hasDipInventory
+                        ? 'Hourly inventory snapshot'
+                        : 'Inventory unavailable'}
+                </p>
                 {inventory?.fetchedAt ? (
                   <p>Updated {new Date(inventory.fetchedAt).toLocaleTimeString()}</p>
+                ) : !inventory?.bySize && hasDipInventory ? (
+                  <p>Updated hourly</p>
                 ) : null}
               </div>
 

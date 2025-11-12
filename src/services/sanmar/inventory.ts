@@ -1,6 +1,8 @@
 import { kv } from '@vercel/kv';
 
+import { prisma } from '@/lib/prisma';
 import type { InventorySnapshot, InventoryQty } from '@/lib/types';
+import { requireEnv } from '@/lib/utils';
 
 const CACHE_PREFIX = 'sanmar:inventory';
 const DEFAULT_TTL = Number.parseInt(process.env.SANMAR_INVENTORY_CACHE_TTL ?? '60', 10);
@@ -238,4 +240,36 @@ export async function getSanmarInventorySnapshot(
   const fresh = await fetchUpstream(partId, colorCode);
   await writeCache(cacheKey, fresh, DEFAULT_TTL);
   return fresh;
+}
+
+export async function getStoredInventorySnapshot(
+  partId: string,
+  colorCode: string
+): Promise<InventorySnapshot | null> {
+  const items = await prisma.productInventory.findMany({
+    where: {
+      supplierPartId: partId.toUpperCase(),
+      colorCode: colorCode.toUpperCase(),
+    },
+  });
+
+  if (!items.length) {
+    return null;
+  }
+
+  const bySize: Record<string, InventoryQty> = {};
+  let latestFetchedAt = items[0].fetchedAt;
+
+  for (const item of items) {
+    bySize[item.sizeCode.toUpperCase()] = { qty: item.totalQty };
+    if (item.fetchedAt > latestFetchedAt) {
+      latestFetchedAt = item.fetchedAt;
+    }
+  }
+
+  return {
+    bySize,
+    fetchedAt: latestFetchedAt.toISOString(),
+    cacheStatus: 'stale',
+  };
 }

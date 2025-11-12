@@ -3,6 +3,19 @@ export type InventoryQty = {
   backorderDate?: string;
 };
 
+export interface ProductInventoryWarehouse {
+  warehouseId: string;
+  quantity: number;
+}
+
+export interface ProductInventorySummary {
+  colorCode: string;
+  sizeCode: string;
+  totalQty: number;
+  fetchedAt: string;
+  warehouses?: ProductInventoryWarehouse[];
+}
+
 export interface ProductColorway {
   colorCode: string;
   colorName: string;
@@ -40,6 +53,7 @@ export interface ProductRecord {
   skuMap: ProductSkuMapEntry[];
   description?: string[];
   attributes?: Record<string, unknown>;
+  inventory?: ProductInventorySummary[];
 }
 
 export type InventorySnapshot = {
