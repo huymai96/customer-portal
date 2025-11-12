@@ -74,7 +74,7 @@ function mapProduct(product: PrismaProduct): ProductRecord {
     id: product.id,
     supplierPartId: product.supplierPartId,
     name: product.name,
-    brand: product.brand ?? undefined,
+    brand: product.brand ?? '',
     defaultColor: product.defaultColor ?? colors[0]?.colorCode ?? 'DEFAULT',
     colors,
     sizes,
