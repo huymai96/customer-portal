@@ -137,14 +137,15 @@ function normalizeProduct(record: UnknownRecord): NormalizedProduct | null {
     record.defaultColor ?? record.DefaultColor ?? record.defaultColorCode ?? record.DefaultColorCode
   );
 
-  const descriptionCandidates = toArray<string | unknown>(
+  const rawDescriptions = (
     record.description ??
-      record.Description ??
-      record.descriptions ??
-      record.Descriptions ??
-      record.marketingCopy ??
-      record.MarketingCopy
-  );
+    record.Description ??
+    record.descriptions ??
+    record.Descriptions ??
+    record.marketingCopy ??
+    record.MarketingCopy
+  ) as (string | unknown) | Array<string | unknown> | null | undefined;
+  const descriptionCandidates = toArray<string | unknown>(rawDescriptions);
   const description = descriptionCandidates
     .map((entry) => readString(entry) ?? null)
     .filter((entry): entry is string => Boolean(entry));
@@ -163,9 +164,10 @@ function normalizeProduct(record: UnknownRecord): NormalizedProduct | null {
     }
   }
 
-  const colorEntries = toArray<UnknownRecord>(
+  const rawColors = (
     record.colors ?? record.Colors ?? record.colorways ?? record.Colorways ?? record.Colorway
-  );
+  ) as UnknownRecord | UnknownRecord[] | null | undefined;
+  const colorEntries = toArray<UnknownRecord>(rawColors);
   const colors = colorEntries
     .map((color) => {
       const colorCode =
@@ -190,9 +192,10 @@ function normalizeProduct(record: UnknownRecord): NormalizedProduct | null {
     })
     .filter((entry): entry is NormalizedProduct['colors'][number] => Boolean(entry));
 
-  const sizeEntries = toArray<UnknownRecord>(
+  const rawSizes = (
     record.sizes ?? record.Sizes ?? record.sizeChart ?? record.SizeChart ?? record.Size
-  );
+  ) as UnknownRecord | UnknownRecord[] | null | undefined;
+  const sizeEntries = toArray<UnknownRecord>(rawSizes);
   const sizes = sizeEntries
     .map((size) => {
       const sizeCode = readString(size?.sizeCode ?? size?.SizeCode ?? size?.code ?? size?.Code);
@@ -208,9 +211,10 @@ function normalizeProduct(record: UnknownRecord): NormalizedProduct | null {
     })
     .filter((entry): entry is NormalizedProduct['sizes'][number] => Boolean(entry));
 
-  const mediaCollections = toArray<UnknownRecord>(
+  const rawMedia = (
     record.media ?? record.Media ?? record.images ?? record.Images ?? record.image ?? record.Image
-  );
+  ) as UnknownRecord | UnknownRecord[] | null | undefined;
+  const mediaCollections = toArray<UnknownRecord>(rawMedia);
   const media: NormalizedProduct['media'] = [];
   for (const entry of mediaCollections) {
     if (entry && Array.isArray(entry)) {
@@ -248,9 +252,10 @@ function normalizeProduct(record: UnknownRecord): NormalizedProduct | null {
     });
   }
 
-  const skuEntries = toArray<UnknownRecord>(
-    record.skus ?? record.Skus ?? record.sku ?? record.Sku ?? record.variants ?? record.Variants
-  );
+  const rawSkus = (
+    record.skuMap ?? record.SkuMap ?? record.sku ?? record.Sku ?? record.skus ?? record.Skus
+  ) as UnknownRecord | UnknownRecord[] | null | undefined;
+  const skuEntries = toArray<UnknownRecord>(rawSkus);
   const skus = skuEntries
     .map((sku) => {
       const colorCode =
@@ -273,9 +278,15 @@ function normalizeProduct(record: UnknownRecord): NormalizedProduct | null {
     })
     .filter((entry): entry is NormalizedProduct['skus'][number] => Boolean(entry));
 
-  const keywordEntries = toArray<string | unknown>(
-    record.keywords ?? record.Keywords ?? record.tags ?? record.Tags
-  );
+  const rawKeywords = (
+    record.keywords ??
+    record.Keywords ??
+    record.tags ??
+    record.Tags ??
+    record.searchTerms ??
+    record.SearchTerms
+  ) as (string | unknown) | Array<string | unknown> | null | undefined;
+  const keywordEntries = toArray<string | unknown>(rawKeywords);
   const keywords = keywordEntries
     .map((entry) => readString(entry) ?? null)
     .filter((entry): entry is string => Boolean(entry))
