@@ -6,6 +6,16 @@ interface AddressAutocompleteProps {
   value: string;
   placeholder?: string;
   onChange: (value: string) => void;
+  onAddressSelected?: (
+    formatted: string,
+    parsed: {
+      line1: string;
+      city?: string;
+      state?: string;
+      postalCode?: string;
+      country?: string;
+    }
+  ) => void;
   onAddressResolved?: (address: {
     line1: string;
     city?: string;
@@ -69,6 +79,7 @@ export function AddressAutocomplete({
   value,
   placeholder,
   onChange,
+  onAddressSelected,
   onAddressResolved,
   disabled,
 }: AddressAutocompleteProps) {
@@ -116,7 +127,7 @@ export function AddressAutocomplete({
           if (!place) return;
           const parsed = parseAddressComponents(place);
           const formatted = place.formatted_address ?? parsed.line1 ?? '';
-          onChange(formatted);
+          onAddressSelected?.(formatted, parsed);
           onAddressResolved?.(parsed);
         });
       })
@@ -130,7 +141,7 @@ export function AddressAutocomplete({
         window.google.maps.event.clearInstanceListeners(autocomplete);
       }
     };
-  }, [loader, disabled, onChange, onAddressResolved]);
+  }, [loader, disabled, onChange, onAddressResolved, onAddressSelected]);
 
   return (
     <input

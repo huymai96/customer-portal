@@ -160,6 +160,16 @@ export function ProjectCartFooter() {
                 setAddress1(next);
                 setAddressVerified(false);
               }}
+              onAddressSelected={(formatted, parsed) => {
+                setAddress1(formatted);
+                setCity(parsed.city ?? '');
+                setRegion(parsed.state ?? '');
+                setPostalCode(parsed.postalCode ?? '');
+                if (parsed.country) {
+                  setCountry(parsed.country);
+                }
+                setAddressVerified(true);
+              }}
               onAddressResolved={(parsed) => {
                 setAddress1(parsed.line1 ?? '');
                 setCity(parsed.city ?? '');
@@ -168,7 +178,6 @@ export function ProjectCartFooter() {
                 if (parsed.country) {
                   setCountry(parsed.country);
                 }
-                setAddressVerified(true);
               }}
               placeholder="Start typing for Google-verified matches"
             />
