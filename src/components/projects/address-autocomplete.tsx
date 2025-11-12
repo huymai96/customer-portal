@@ -20,7 +20,7 @@ const loaderCache = new Map<string, Loader>();
 const countriesEnv = process.env.NEXT_PUBLIC_GOOGLE_AUTOCOMPLETE_COUNTRIES;
 const defaultCountries = countriesEnv
   ?.split(',')
-  .map((entry) => entry.trim().toLowerCase())
+  .map((entry) => entry.trim().toUpperCase())
   .filter(Boolean);
 
 function getLoader(apiKey: string) {
@@ -115,7 +115,8 @@ export function AddressAutocomplete({
           const place = autocomplete.getPlace();
           if (!place) return;
           const parsed = parseAddressComponents(place);
-          onChange(parsed.line1);
+          const formatted = place.formatted_address ?? parsed.line1 ?? '';
+          onChange(formatted);
           onAddressResolved?.(parsed);
         });
       })
@@ -139,6 +140,7 @@ export function AddressAutocomplete({
       value={value}
       disabled={disabled}
       placeholder={placeholder}
+      autoComplete="off"
       onChange={(event) => onChange(event.target.value)}
       className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 disabled:cursor-not-allowed disabled:bg-slate-100"
     />
