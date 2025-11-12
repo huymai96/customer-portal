@@ -70,6 +70,11 @@ function mapProduct(product: PrismaProduct): ProductRecord {
     warehouses: Array.isArray(entry.warehouses) ? (entry.warehouses as Array<{ warehouseId: string; quantity: number }>) : undefined,
   }));
 
+  let attributes: Record<string, unknown> | undefined;
+  if (product.attributes && typeof product.attributes === 'object' && !Array.isArray(product.attributes)) {
+    attributes = product.attributes as Record<string, unknown>;
+  }
+
   return {
     id: product.id,
     supplierPartId: product.supplierPartId,
@@ -81,7 +86,7 @@ function mapProduct(product: PrismaProduct): ProductRecord {
     media,
     skuMap,
     description: Array.isArray(product.description) ? (product.description as string[]) : [],
-    attributes: product.attributes ?? undefined,
+    attributes,
     inventory,
   };
 }
