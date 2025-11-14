@@ -101,47 +101,62 @@ async function fetchRest<T>(
  * We try both approaches to maximize compatibility.
  */
 export async function fetchRestProducts(identifier: string): Promise<RestProduct[]> {
-  // Try searching by style first
+  // For identifiers that look like manufacturer style numbers (e.g., "5000"),
+  // convert to SSActivewear partNumber format first (e.g., "00060")
+  const partNumber = identifier.replace(/^B/i, '').padStart(5, '0');
+  
+  // Try searching by partNumber first (most reliable for Gildan products)
   try {
-    const data = await fetchRest<RestProduct[]>('/products', { style: identifier });
+    const data = await fetchRest<RestProduct[]>('/products', { style: partNumber });
     if (Array.isArray(data) && data.length > 0) {
       return data;
     }
   } catch {
-    // Style search failed, will try partNumber next
+    // PartNumber search failed, will try original identifier next
   }
   
-  // If style search fails or returns no results, try searching by partNumber
-  // For Gildan products, partNumber is often the 5-digit code (e.g., "00060")
-  const partNumber = identifier.replace(/^B/i, '').padStart(5, '0');
-  const data = await fetchRest<RestProduct[]>('/products', { style: partNumber });
-  if (!Array.isArray(data)) {
-    return [];
+  // If partNumber search fails, try the original identifier
+  // This handles cases where the identifier is already in the correct format
+  try {
+    const data = await fetchRest<RestProduct[]>('/products', { style: identifier });
+    if (Array.isArray(data)) {
+      return data;
+    }
+  } catch {
+    // Both attempts failed
   }
-  return data;
+  
+  return [];
 }
 
 /**
  * Fetch style metadata (name, description, categories).
  */
 export async function fetchRestStyle(identifier: string): Promise<RestStyle | null> {
-  // Try searching by style first
+  // Convert to partNumber format first
+  const partNumber = identifier.replace(/^B/i, '').padStart(5, '0');
+  
+  // Try searching by partNumber first
+  try {
+    const data = await fetchRest<RestStyle[]>('/styles', { style: partNumber });
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0] ?? null;
+    }
+  } catch {
+    // PartNumber search failed, will try original identifier next
+  }
+  
+  // Try with original identifier
   try {
     const data = await fetchRest<RestStyle[]>('/styles', { style: identifier });
     if (Array.isArray(data) && data.length > 0) {
       return data[0] ?? null;
     }
   } catch {
-    // Style search failed, will try partNumber next
+    // Both attempts failed
   }
   
-  // Try with partNumber format
-  const partNumber = identifier.replace(/^B/i, '').padStart(5, '0');
-  const data = await fetchRest<RestStyle[]>('/styles', { style: partNumber });
-  if (!Array.isArray(data) || data.length === 0) {
-    return null;
-  }
-  return data[0] ?? null;
+  return null;
 }
 
 /**
