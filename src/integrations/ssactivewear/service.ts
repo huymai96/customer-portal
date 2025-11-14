@@ -59,35 +59,58 @@ function createWarnings(errors: unknown[]): string[] | undefined {
 }
 
 /**
- * Fetch product data with REST primary, PromoStandards fallback.
+ * Fetch product data using PromoStandards + REST hybrid approach.
  * 
- * NOTE: SSActivewear's PromoStandards Product Data service doesn't return
- * colors/sizes/parts, so we use REST API as primary source.
+ * STRATEGY:
+ * 1. Call PromoStandards to get the real style number (e.g., B00060 → 5000)
+ * 2. Use that style number to fetch full data from REST API
+ * 3. Fall back to PromoStandards-only if REST fails
+ * 
+ * NOTE: SSActivewear's B-prefix SKUs (B00060) don't map directly to REST API
+ * style numbers. PromoStandards returns the actual style (5000) which we can
+ * then use with the REST API.
  */
 export async function fetchProductWithFallback(productId: string): Promise<ProductResult> {
   const attemptErrors: unknown[] = [];
   const normalizedId = toSsaProductId(productId);
 
-  // Attempt 1: REST API v2 (primary for SSActivewear)
+  // Attempt 1: PromoStandards to get real style number
+  try {
+    const xml = await getProduct({ productId: normalizedId });
+    const psProduct = await parseProductXml(xml, normalizedId);
+    
+    // Extract the real style number from PromoStandards response
+    const realStyleNumber = psProduct.id || normalizedId;
+    
+    // Attempt 1b: Use real style number with REST API for complete data
+    try {
+      const bundle = await fetchRestBundle(realStyleNumber);
+      const product = buildProductFromRest(normalizedId, bundle);
+      return {
+        product,
+        source: 'rest',
+        fetchedAt: new Date().toISOString(),
+      };
+    } catch (restError) {
+      // REST failed, but we have PromoStandards data
+      return {
+        product: psProduct,
+        source: 'promostandards',
+        fetchedAt: new Date().toISOString(),
+        warnings: [`REST API failed, using limited PromoStandards data: ${restError instanceof Error ? restError.message : String(restError)}`],
+      };
+    }
+  } catch (error) {
+    attemptErrors.push(error);
+  }
+
+  // Attempt 2: Direct REST API call (fallback)
   try {
     const bundle = await fetchRestBundle(normalizedId);
     const product = buildProductFromRest(normalizedId, bundle);
     return {
       product,
       source: 'rest',
-      fetchedAt: new Date().toISOString(),
-    };
-  } catch (error) {
-    attemptErrors.push(error);
-  }
-
-  // Attempt 2: PromoStandards SOAP (fallback, limited data)
-  try {
-    const xml = await getProduct({ productId: normalizedId });
-    const product = await parseProductXml(xml, normalizedId);
-    return {
-      product,
-      source: 'promostandards',
       fetchedAt: new Date().toISOString(),
       warnings: createWarnings(attemptErrors),
     };
