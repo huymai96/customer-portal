@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import type { DecorationSpec, DecorationMethod } from '@/lib/types';
 import { useProjectCart } from './project-cart-context';
 import { ProjectCartFooter } from './project-cart-footer';
+import { DecorationForm, type DecorationFormData } from '@/components/decorations/decoration-form';
 
 const METHOD_LABELS: Record<DecorationMethod, string> = {
   screen: 'Screen Print',
