@@ -107,19 +107,23 @@ export async function fetchRestProducts(identifier: string): Promise<RestProduct
   
   // Try searching by partNumber first (most reliable for Gildan products)
   try {
+    console.log(`[SSActivewear REST] Trying partNumber: ${partNumber}`);
     const data = await fetchRest<RestProduct[]>('/products', { style: partNumber });
+    console.log(`[SSActivewear REST] partNumber result: ${data.length} products`);
     if (Array.isArray(data) && data.length > 0) {
       return data;
     }
-  } catch {
-    // PartNumber search failed, will try original identifier next
+    // If we got an empty array, don't return it yet - try the original identifier
+  } catch (error) {
+    console.log(`[SSActivewear REST] partNumber error:`, error);
+    // PartNumber search failed with error, will try original identifier next
   }
   
-  // If partNumber search fails, try the original identifier
+  // If partNumber search returns empty or fails, try the original identifier
   // This handles cases where the identifier is already in the correct format
   try {
     const data = await fetchRest<RestProduct[]>('/products', { style: identifier });
-    if (Array.isArray(data)) {
+    if (Array.isArray(data) && data.length > 0) {
       return data;
     }
   } catch {
