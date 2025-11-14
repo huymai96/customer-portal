@@ -71,6 +71,8 @@ export async function parseProductXml(xml: string, productId: string): Promise<P
     throw new Error('Product data not found in response');
   }
 
+  // Extract the actual style number from PromoStandards (e.g., "5000" not "B00060")
+  const realProductId = getText(product.productId) || productId;
   const name = getText(product.productName) || productId;
   const brand = getText(product.productBrand) || '';
   const description = getText(product.description);
@@ -149,8 +151,8 @@ export async function parseProductXml(xml: string, productId: string): Promise<P
   );
 
   return {
-    id: productId,
-    supplierPartId: productId,
+    id: realProductId, // Use the real style number from PromoStandards
+    supplierPartId: productId, // Keep the B-prefix for reference
     name,
     brand,
     defaultColor,
