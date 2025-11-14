@@ -11,6 +11,9 @@ const METHOD_LABELS: Record<DecorationMethod, string> = {
   emb: 'Embroidery',
   dtf: 'DTF Transfer',
   heat: 'Heat Transfer',
+  dtg: 'DTG Print',
+  sublimation: 'Sublimation',
+  patch: 'Patch / Applique',
 };
 
 function DecorationEditor({

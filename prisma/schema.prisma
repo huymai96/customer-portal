@@ -8,21 +8,21 @@ datasource db {
 }
 
 model Product {
-  id               String            @id @default(uuid())
-  supplierPartId   String            @unique
-  name             String
-  brand            String?
-  defaultColor     String?
-  description      Json?
-  attributes       Json?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  colors           ProductColor[]
-  sizes            ProductSize[]
-  media            ProductMedia[]
-  skus             ProductSku[]
-  keywords         ProductKeyword[]
-  inventory        ProductInventory[]
+  id             String             @id @default(uuid())
+  supplierPartId String             @unique
+  name           String
+  brand          String?
+  defaultColor   String?
+  description    Json?
+  attributes     Json?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  colors         ProductColor[]
+  sizes          ProductSize[]
+  media          ProductMedia[]
+  skus           ProductSku[]
+  keywords       ProductKeyword[]
+  inventory      ProductInventory[]
 
   @@index([supplierPartId])
 }
@@ -43,62 +43,160 @@ model ProductColor {
 }
 
 model ProductSize {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   productId String
   sizeCode  String
   display   String?
   sort      Int?
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([productId, sizeCode])
   @@index([sizeCode])
 }
 
 model ProductMedia {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   productId String
   colorCode String?
   url       String
   position  Int?
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId, colorCode])
 }
 
 model ProductSku {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   productId   String
   colorCode   String
   sizeCode    String
   supplierSku String
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([productId, colorCode, sizeCode])
   @@index([supplierSku])
 }
 
 model ProductKeyword {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   productId String
   keyword   String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([productId, keyword])
   @@index([keyword])
 }
 
 model ProductInventory {
-  id              String   @id @default(uuid())
-  productId       String?
-  supplierPartId  String
-  colorCode       String
-  sizeCode        String
-  totalQty        Int
-  warehouses      Json?
-  fetchedAt       DateTime
-  updatedAt       DateTime @updatedAt
-  product         Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id             String   @id @default(uuid())
+  productId      String?
+  supplierPartId String
+  colorCode      String
+  sizeCode       String
+  totalQty       Int
+  warehouses     Json?
+  fetchedAt      DateTime
+  updatedAt      DateTime @updatedAt
+  product        Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([supplierPartId, colorCode, sizeCode])
   @@index([supplierPartId])
+}
+
+enum OrderStatus {
+  DRAFT
+  QUOTED
+  APPROVED
+  IN_PRODUCTION
+  SHIPPED
+  CANCELLED
+}
+
+enum DecorationMethod {
+  SCREEN
+  EMB
+  DTF
+  HEAT
+  DTG
+  SUBLIMATION
+  PATCH
+}
+
+enum ArtworkAssetType {
+  DESIGN
+  PROOF
+  REFERENCE
+  OTHER
+}
+
+model Order {
+  id              String            @id @default(uuid())
+  externalId      String?           @unique
+  customerName    String?
+  customerEmail   String?
+  customerCompany String?
+  status          OrderStatus       @default(DRAFT)
+  notes           String?
+  metadata        Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  lines           OrderLine[]
+  decorations     OrderDecoration[]
+  artworks        ArtworkAsset[]
+
+  @@index([status])
+}
+
+model OrderLine {
+  id             String            @id @default(uuid())
+  orderId        String
+  supplierPartId String
+  colorCode      String
+  sizeCode       String
+  quantity       Int
+  metadata       Json?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  order          Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  decorations    OrderDecoration[]
+
+  @@index([orderId])
+  @@index([supplierPartId])
+}
+
+model OrderDecoration {
+  id            String           @id @default(uuid())
+  orderId       String
+  orderLineId   String?
+  method        DecorationMethod
+  location      String?
+  colors        Int?
+  notes         String?
+  proofRequired Boolean          @default(true)
+  metadata      Json?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  order         Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  line          OrderLine?       @relation(fields: [orderLineId], references: [id], onDelete: SetNull)
+  artworks      ArtworkAsset[]
+
+  @@index([orderId])
+  @@index([orderLineId])
+  @@index([method])
+}
+
+model ArtworkAsset {
+  id                String           @id @default(uuid())
+  orderId           String?
+  orderDecorationId String?
+  type              ArtworkAssetType
+  url               String
+  metadata          Json?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  order             Order?           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  decoration        OrderDecoration? @relation(fields: [orderDecorationId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([orderDecorationId])
 }

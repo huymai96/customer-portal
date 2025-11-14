@@ -1,77 +1,76 @@
+/**
+ * SSActivewear Integration Configuration
+ * 
+ * Credentials and endpoints for both PromoStandards (SOAP) and REST API v2.
+ * Per S&S support: the same account number + API key work for both services.
+ */
+
 const REQUIRED_ENV_VARS = [
-  'SSACTIVEWEAR_PROMOSTANDARDS_USERNAME',
-  'SSACTIVEWEAR_PROMOSTANDARDS_PASSWORD',
-  'SSACTIVEWEAR_PROMOSTANDARDS_PRODUCT_URL',
-  'SSACTIVEWEAR_PROMOSTANDARDS_INVENTORY_URL',
   'SSACTIVEWEAR_ACCOUNT_NUMBER',
   'SSACTIVEWEAR_API_KEY',
 ] as const;
 
-type RequiredEnvVar = (typeof REQUIRED_ENV_VARS)[number];
-
-function requireEnv(name: RequiredEnvVar): string {
-  const value = process.env[name];
-  if (!value || !value.trim()) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
-}
-
 export interface SsaConfig {
-  username: string;
-  password: string;
-  productUrl: string;
-  inventoryUrl: string;
   accountNumber: string;
   apiKey: string;
+  promoStandardsProductUrl: string;
+  promoStandardsInventoryUrl: string;
   restBaseUrl: string;
-  pricingUrl?: string;
-  orderStatusUrl?: string;
-  purchaseOrderUrl?: string;
 }
 
 export function loadConfig(): SsaConfig {
-  for (const name of REQUIRED_ENV_VARS) {
-    requireEnv(name);
+  for (const key of REQUIRED_ENV_VARS) {
+    if (!process.env[key]) {
+      throw new Error(`Missing required environment variable: ${key}`);
+    }
   }
-
-  const baseConfig = {
-    username: requireEnv('SSACTIVEWEAR_PROMOSTANDARDS_USERNAME'),
-    password: requireEnv('SSACTIVEWEAR_PROMOSTANDARDS_PASSWORD'),
-    productUrl: requireEnv('SSACTIVEWEAR_PROMOSTANDARDS_PRODUCT_URL'),
-    inventoryUrl: requireEnv('SSACTIVEWEAR_PROMOSTANDARDS_INVENTORY_URL'),
-    accountNumber: requireEnv('SSACTIVEWEAR_ACCOUNT_NUMBER'),
-    apiKey: requireEnv('SSACTIVEWEAR_API_KEY'),
-  };
 
   return {
-    ...baseConfig,
-    restBaseUrl: process.env.SSACTIVEWEAR_REST_BASE_URL?.trim() || 'https://api.ssactivewear.com/V2',
-    pricingUrl: process.env.SSACTIVEWEAR_PROMOSTANDARDS_PPC_URL,
-    orderStatusUrl: process.env.SSACTIVEWEAR_PROMOSTANDARDS_ORDER_STATUS_URL,
-    purchaseOrderUrl: process.env.SSACTIVEWEAR_PROMOSTANDARDS_PURCHASE_ORDER_URL,
+    accountNumber: process.env.SSACTIVEWEAR_ACCOUNT_NUMBER!.trim(),
+    apiKey: process.env.SSACTIVEWEAR_API_KEY!.trim(),
+    promoStandardsProductUrl:
+      process.env.SSACTIVEWEAR_PROMOSTANDARDS_PRODUCT_URL?.trim() ||
+      'https://promostandards.ssactivewear.com/productdata/v2/productdataservicev2.svc',
+    promoStandardsInventoryUrl:
+      process.env.SSACTIVEWEAR_PROMOSTANDARDS_INVENTORY_URL?.trim() ||
+      'https://promostandards.ssactivewear.com/inventory/v2/inventoryservice.svc',
+    restBaseUrl:
+      process.env.SSACTIVEWEAR_REST_BASE_URL?.trim() ||
+      'https://api.ssactivewear.com/V2',
   };
 }
 
-export const PRODUCT_ID_PREFIX = 'B';
-
-export function toSsaProductId(itemNumber: string): string {
-  const normalized = itemNumber.trim().toUpperCase();
-  if (normalized.startsWith(PRODUCT_ID_PREFIX)) {
-    return normalized;
+/**
+ * Normalize a product ID to SSActivewear's format.
+ * SSActivewear uses a "B" prefix + 5-digit style number (e.g., "B00060" for Gildan 5000).
+ */
+export function toSsaProductId(productId: string): string {
+  const trimmed = productId.trim().toUpperCase();
+  
+  // Already has B prefix and looks valid
+  if (trimmed.startsWith('B') && trimmed.length >= 6) {
+    return trimmed;
   }
-  return `${PRODUCT_ID_PREFIX}${normalized}`;
-}
-
-export function toStyleNumber(productId: string): string {
-  const digits = productId.trim().replace(/[^0-9]/gu, '');
+  
+  // Extract digits only
+  const digits = trimmed.replace(/[^0-9]/gu, '');
   if (digits.length === 0) {
-    return productId.trim();
+    return trimmed; // Return as-is if no digits found
   }
-  if (digits.length >= 5) {
-    return digits.slice(-5);
-  }
-  return digits.padStart(5, '0');
+  
+  // Pad to 5 digits and add B prefix
+  const paddedDigits = digits.length >= 5 
+    ? digits.slice(-5) 
+    : digits.padStart(5, '0');
+  
+  return `B${paddedDigits}`;
 }
 
+/**
+ * Convert SSActivewear product ID to style number (remove B prefix).
+ */
+export function toStyleNumber(productId: string): string {
+  const normalized = toSsaProductId(productId);
+  return normalized.startsWith('B') ? normalized.slice(1) : normalized;
+}
 

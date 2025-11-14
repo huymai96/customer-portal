@@ -62,7 +62,15 @@ export type InventorySnapshot = {
   cacheStatus?: 'hit' | 'refreshed' | 'stale';
 };
 
-export type DecorationMethod = 'screen' | 'emb' | 'dtf' | 'heat';
+export type DecorationMethod = 'screen' | 'emb' | 'dtf' | 'heat' | 'dtg' | 'sublimation' | 'patch';
+
+export type DecorationArtworkType = 'design' | 'proof' | 'reference' | 'other';
+
+export interface DecorationArtwork {
+  type: DecorationArtworkType;
+  url: string;
+  metadata?: Record<string, unknown>;
+}
 
 export interface DecorationLocation {
   name: string;
@@ -88,6 +96,32 @@ export interface CartLine {
   qty: number;
   decoration?: DecorationSpec | null;
   supplierSku?: string | null;
+}
+
+export interface DecorationOrderLineInput {
+  supplierPartId: string;
+  colorCode: string;
+  sizeCode: string;
+  quantity: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface DecorationOrderRequest {
+  customerName?: string;
+  customerEmail?: string;
+  customerCompany?: string;
+  notes?: string;
+  metadata?: Record<string, unknown>;
+  lines?: DecorationOrderLineInput[];
+  decorations?: Array<
+    DecorationSpec & {
+      lineIndex?: number;
+      proofRequired?: boolean;
+      metadata?: Record<string, unknown>;
+      artworks?: DecorationArtwork[];
+    }
+  >;
+  artworks?: DecorationArtwork[];
 }
 
 export interface ContactInfo {
