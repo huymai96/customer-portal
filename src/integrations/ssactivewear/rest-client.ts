@@ -65,7 +65,11 @@ async function fetchRest<T>(
   params: Record<string, string | undefined> = {}
 ): Promise<T> {
   const config = loadConfig();
-  const url = new URL(path, config.restBaseUrl);
+  const base = config.restBaseUrl.endsWith('/')
+    ? config.restBaseUrl
+    : `${config.restBaseUrl}/`;
+  const normalizedPath = path.replace(/^\/+/, '');
+  const url = new URL(normalizedPath, base);
 
   for (const [key, value] of Object.entries(params)) {
     if (value != null && value !== '') {
@@ -104,21 +108,18 @@ export async function fetchRestProducts(identifier: string): Promise<RestProduct
   // For identifiers that look like manufacturer style numbers (e.g., "5000"),
   // convert to SSActivewear partNumber format first (e.g., "00060")
   const partNumber = identifier.replace(/^B/i, '').padStart(5, '0');
-  
+
   // Try searching by partNumber first (most reliable for Gildan products)
   try {
-    console.log(`[SSActivewear REST] Trying partNumber: ${partNumber}`);
     const data = await fetchRest<RestProduct[]>('/products', { style: partNumber });
-    console.log(`[SSActivewear REST] partNumber result: ${data.length} products`);
     if (Array.isArray(data) && data.length > 0) {
       return data;
     }
     // If we got an empty array, don't return it yet - try the original identifier
-  } catch (error) {
-    console.log(`[SSActivewear REST] partNumber error:`, error);
+  } catch {
     // PartNumber search failed with error, will try original identifier next
   }
-  
+
   // If partNumber search returns empty or fails, try the original identifier
   // This handles cases where the identifier is already in the correct format
   try {
@@ -129,7 +130,7 @@ export async function fetchRestProducts(identifier: string): Promise<RestProduct
   } catch {
     // Both attempts failed
   }
-  
+
   return [];
 }
 
@@ -139,7 +140,7 @@ export async function fetchRestProducts(identifier: string): Promise<RestProduct
 export async function fetchRestStyle(identifier: string): Promise<RestStyle | null> {
   // Convert to partNumber format first
   const partNumber = identifier.replace(/^B/i, '').padStart(5, '0');
-  
+
   // Try searching by partNumber first
   try {
     const data = await fetchRest<RestStyle[]>('/styles', { style: partNumber });
@@ -149,7 +150,7 @@ export async function fetchRestStyle(identifier: string): Promise<RestStyle | nu
   } catch {
     // PartNumber search failed, will try original identifier next
   }
-  
+
   // Try with original identifier
   try {
     const data = await fetchRest<RestStyle[]>('/styles', { style: identifier });
@@ -159,7 +160,7 @@ export async function fetchRestStyle(identifier: string): Promise<RestStyle | nu
   } catch {
     // Both attempts failed
   }
-  
+
   return null;
 }
 

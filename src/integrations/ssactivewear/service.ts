@@ -1,20 +1,16 @@
 /**
- * Unified SSActivewear Service Layer
- * 
- * Attempts PromoStandards SOAP first, falls back to REST API v2 on failure.
- * Returns structured data with source tracking and warnings.
+ * SSActivewear REST-only Service Layer
+ *
+ * Provides catalog + inventory access backed solely by the V2 REST API.
  */
 
 import type { InventorySnapshot, ProductRecord } from '@/lib/types';
 
 import { toSsaProductId } from './config';
-import { getProduct } from './product-data';
-import { getInventoryLevels } from './inventory-service';
 import { fetchRestBundle } from './rest-client';
-import { parseProductXml, parseInventoryXml } from './xml-parser';
 import { buildProductFromRest, buildInventoryFromRest } from './rest-parser';
 
-export type DataSource = 'promostandards' | 'rest';
+export type DataSource = 'rest';
 
 interface BaseResult {
   source: DataSource;
@@ -30,137 +26,39 @@ export interface InventoryResult extends BaseResult {
   inventory: InventorySnapshot;
 }
 
-function aggregateErrors(errors: unknown[]): Error {
-  if (errors.length === 1) {
-    const [error] = errors;
-    return error instanceof Error ? error : new Error(String(error));
-  }
-  const message = errors
-    .map((error, index) => {
-      if (error instanceof Error) {
-        return `${index + 1}. ${error.message}`;
-      }
-      return `${index + 1}. ${String(error)}`;
-    })
-    .join('\n');
-  return new Error(`Multiple failures encountered:\n${message}`);
-}
-
-function createWarnings(errors: unknown[]): string[] | undefined {
-  if (errors.length === 0) {
-    return undefined;
-  }
-  return errors.map((error) => {
-    if (error instanceof Error) {
-      return error.message;
-    }
-    return String(error);
-  });
-}
-
 /**
- * Fetch product data using PromoStandards + REST hybrid approach.
- * 
- * STRATEGY:
- * 1. Call PromoStandards to get the real style number (e.g., B00060 → 5000)
- * 2. Use that style number to fetch full data from REST API
- * 3. Fall back to PromoStandards-only if REST fails
- * 
- * NOTE: SSActivewear's B-prefix SKUs (B00060) don't map directly to REST API
- * style numbers. PromoStandards returns the actual style (5000) which we can
- * then use with the REST API.
+ * Fetch product data via SSActivewear REST API v2.
  */
 export async function fetchProductWithFallback(productId: string): Promise<ProductResult> {
-  const attemptErrors: unknown[] = [];
   const normalizedId = toSsaProductId(productId);
+  const bundle = await fetchRestBundle(normalizedId);
+  const product = buildProductFromRest(normalizedId, bundle);
 
-  // Attempt 1: PromoStandards to get basic product info
-  try {
-    const xml = await getProduct({ productId: normalizedId });
-    const psProduct = await parseProductXml(xml, normalizedId);
-    
-    // Attempt 1b: Use the ORIGINAL identifier (B00060) with REST API for complete data
-    // NOTE: PromoStandards returns manufacturer style (5000), but REST API needs
-    // SSActivewear's partNumber (00060). The original B00060 identifier maps correctly.
-    try {
-      const bundle = await fetchRestBundle(normalizedId); // Use B00060, not 5000
-      const product = buildProductFromRest(normalizedId, bundle);
-      return {
-        product,
-        source: 'rest',
-        fetchedAt: new Date().toISOString(),
-      };
-    } catch (restError) {
-      // REST failed, but we have PromoStandards data
-      return {
-        product: psProduct,
-        source: 'promostandards',
-        fetchedAt: new Date().toISOString(),
-        warnings: [`REST API failed, using limited PromoStandards data: ${restError instanceof Error ? restError.message : String(restError)}`],
-      };
-    }
-  } catch (error) {
-    attemptErrors.push(error);
-  }
-
-  // Attempt 2: Direct REST API call (fallback)
-  try {
-    const bundle = await fetchRestBundle(normalizedId);
-    const product = buildProductFromRest(normalizedId, bundle);
-    return {
-      product,
-      source: 'rest',
-      fetchedAt: new Date().toISOString(),
-      warnings: createWarnings(attemptErrors),
-    };
-  } catch (error) {
-    attemptErrors.push(error);
-  }
-
-  throw aggregateErrors(attemptErrors);
+  return {
+    product,
+    source: 'rest',
+    fetchedAt: new Date().toISOString(),
+    warnings: undefined,
+  };
 }
 
 /**
- * Fetch inventory data with PromoStandards → REST fallback.
+ * Fetch inventory data via SSActivewear REST API v2.
  */
 export async function fetchInventoryWithFallback(
   productId: string,
   colorCode?: string
 ): Promise<InventoryResult> {
-  const attemptErrors: unknown[] = [];
   const normalizedId = toSsaProductId(productId);
+  const bundle = await fetchRestBundle(normalizedId);
+  const inventory = buildInventoryFromRest(bundle.products, colorCode);
 
-  // Attempt 1: PromoStandards SOAP
-  try {
-    const xml = await getInventoryLevels({ 
-      productId: normalizedId,
-      color: colorCode,
-    });
-    const inventory = await parseInventoryXml(xml, normalizedId, colorCode);
-    return {
-      inventory,
-      source: 'promostandards',
-      fetchedAt: new Date().toISOString(),
-    };
-  } catch (error) {
-    attemptErrors.push(error);
-  }
-
-  // Attempt 2: REST API v2
-  try {
-    const bundle = await fetchRestBundle(normalizedId);
-    const inventory = buildInventoryFromRest(bundle.products, colorCode);
-    return {
-      inventory,
-      source: 'rest',
-      fetchedAt: new Date().toISOString(),
-      warnings: createWarnings(attemptErrors),
-    };
-  } catch (error) {
-    attemptErrors.push(error);
-  }
-
-  throw aggregateErrors(attemptErrors);
+  return {
+    inventory,
+    source: 'rest',
+    fetchedAt: new Date().toISOString(),
+    warnings: undefined,
+  };
 }
 
 /**
@@ -169,8 +67,9 @@ export async function fetchInventoryWithFallback(
  */
 export function buildColorInventorySnapshot(
   inventory: InventorySnapshot,
-  _colorCode: string
+  colorCode: string
 ): InventorySnapshot {
+  void colorCode;
   // SSActivewear inventory is already aggregated by size across all colors
   // This function exists for API compatibility but returns the full snapshot
   return {
