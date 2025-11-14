@@ -41,6 +41,7 @@ interface RestProduct {
 }
 
 interface RestStyle {
+  styleID?: number | string;
   styleName?: string;
   brandName?: string;
   title?: string;
@@ -48,6 +49,12 @@ interface RestStyle {
   baseCategory?: string;
   categories?: string;
   lineName?: string;
+}
+
+interface RestStyleHints {
+  styleId?: number | string;
+  brandName?: string;
+  styleName?: string;
 }
 
 export interface RestBundle {
@@ -137,31 +144,40 @@ export async function fetchRestProducts(identifier: string): Promise<RestProduct
 /**
  * Fetch style metadata (name, description, categories).
  */
-export async function fetchRestStyle(identifier: string): Promise<RestStyle | null> {
-  // Convert to partNumber format first
+export async function fetchRestStyle(
+  identifier: string,
+  hints?: RestStyleHints
+): Promise<RestStyle | null> {
+  const candidates: RestStyle[] = [];
   const partNumber = identifier.replace(/^B/i, '').padStart(5, '0');
 
   // Try searching by partNumber first
   try {
     const data = await fetchRest<RestStyle[]>('/styles', { style: partNumber });
     if (Array.isArray(data) && data.length > 0) {
-      return data[0] ?? null;
+      candidates.push(...data);
     }
   } catch {
-    // PartNumber search failed, will try original identifier next
+    // Ignore and try fallback
   }
 
-  // Try with original identifier
-  try {
-    const data = await fetchRest<RestStyle[]>('/styles', { style: identifier });
-    if (Array.isArray(data) && data.length > 0) {
-      return data[0] ?? null;
+  // Try with original identifier if we still don't have a match
+  if (candidates.length === 0 || partNumber !== identifier) {
+    try {
+      const data = await fetchRest<RestStyle[]>('/styles', { style: identifier });
+      if (Array.isArray(data) && data.length > 0) {
+        candidates.push(...data);
+      }
+    } catch {
+      // Ignore
     }
-  } catch {
-    // Both attempts failed
   }
 
-  return null;
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return selectMatchingStyle(candidates, hints);
 }
 
 /**
@@ -169,12 +185,47 @@ export async function fetchRestStyle(identifier: string): Promise<RestStyle | nu
  */
 export async function fetchRestBundle(productId: string): Promise<RestBundle> {
   const styleNumber = toStyleNumber(productId);
-  
-  const [products, style] = await Promise.all([
-    fetchRestProducts(styleNumber),
-    fetchRestStyle(styleNumber).catch(() => null),
-  ]);
+  const products = await fetchRestProducts(styleNumber);
+  const primaryProduct = products[0];
+
+  const style = await fetchRestStyle(styleNumber, {
+    styleId: primaryProduct?.styleID,
+    brandName: primaryProduct?.brandName,
+    styleName: primaryProduct?.styleName,
+  }).catch(() => null);
 
   return { products, style };
+}
+
+function selectMatchingStyle(styles: RestStyle[], hints?: RestStyleHints): RestStyle | null {
+  if (!styles.length) {
+    return null;
+  }
+
+  if (hints?.styleId != null) {
+    const target = Number(hints.styleId);
+    const match = styles.find((style) => Number(style.styleID) === target);
+    if (match) {
+      return match;
+    }
+  }
+
+  if (hints?.brandName) {
+    const target = hints.brandName.trim().toUpperCase();
+    const match = styles.find((style) => style.brandName?.trim().toUpperCase() === target);
+    if (match) {
+      return match;
+    }
+  }
+
+  if (hints?.styleName) {
+    const target = hints.styleName.trim().toUpperCase();
+    const match = styles.find((style) => style.styleName?.trim().toUpperCase() === target);
+    if (match) {
+      return match;
+    }
+  }
+
+  return styles[0];
 }
 
