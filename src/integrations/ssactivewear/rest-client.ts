@@ -92,10 +92,29 @@ async function fetchRest<T>(
 }
 
 /**
- * Fetch all products (SKUs) for a given style number.
+ * Fetch all products (SKUs) for a given style number or part number.
+ * 
+ * NOTE: SSActivewear uses different identifiers:
+ * - `style` parameter searches by styleName (e.g., "5000" for Bella+Canvas)
+ * - For Gildan products, we need to use partNumber (e.g., "00060" for Gildan 5000)
+ * 
+ * We try both approaches to maximize compatibility.
  */
-export async function fetchRestProducts(styleNumber: string): Promise<RestProduct[]> {
-  const data = await fetchRest<RestProduct[]>('/products', { style: styleNumber });
+export async function fetchRestProducts(identifier: string): Promise<RestProduct[]> {
+  // Try searching by style first
+  try {
+    const data = await fetchRest<RestProduct[]>('/products', { style: identifier });
+    if (Array.isArray(data) && data.length > 0) {
+      return data;
+    }
+  } catch {
+    // Style search failed, will try partNumber next
+  }
+  
+  // If style search fails or returns no results, try searching by partNumber
+  // For Gildan products, partNumber is often the 5-digit code (e.g., "00060")
+  const partNumber = identifier.replace(/^B/i, '').padStart(5, '0');
+  const data = await fetchRest<RestProduct[]>('/products', { style: partNumber });
   if (!Array.isArray(data)) {
     return [];
   }
@@ -105,8 +124,20 @@ export async function fetchRestProducts(styleNumber: string): Promise<RestProduc
 /**
  * Fetch style metadata (name, description, categories).
  */
-export async function fetchRestStyle(styleNumber: string): Promise<RestStyle | null> {
-  const data = await fetchRest<RestStyle[]>('/styles', { style: styleNumber });
+export async function fetchRestStyle(identifier: string): Promise<RestStyle | null> {
+  // Try searching by style first
+  try {
+    const data = await fetchRest<RestStyle[]>('/styles', { style: identifier });
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0] ?? null;
+    }
+  } catch {
+    // Style search failed, will try partNumber next
+  }
+  
+  // Try with partNumber format
+  const partNumber = identifier.replace(/^B/i, '').padStart(5, '0');
+  const data = await fetchRest<RestStyle[]>('/styles', { style: partNumber });
   if (!Array.isArray(data) || data.length === 0) {
     return null;
   }
