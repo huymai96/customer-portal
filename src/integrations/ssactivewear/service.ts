@@ -74,17 +74,16 @@ export async function fetchProductWithFallback(productId: string): Promise<Produ
   const attemptErrors: unknown[] = [];
   const normalizedId = toSsaProductId(productId);
 
-  // Attempt 1: PromoStandards to get real style number
+  // Attempt 1: PromoStandards to get basic product info
   try {
     const xml = await getProduct({ productId: normalizedId });
     const psProduct = await parseProductXml(xml, normalizedId);
     
-    // Extract the real style number from PromoStandards response
-    const realStyleNumber = psProduct.id || normalizedId;
-    
-    // Attempt 1b: Use real style number with REST API for complete data
+    // Attempt 1b: Use the ORIGINAL identifier (B00060) with REST API for complete data
+    // NOTE: PromoStandards returns manufacturer style (5000), but REST API needs
+    // SSActivewear's partNumber (00060). The original B00060 identifier maps correctly.
     try {
-      const bundle = await fetchRestBundle(realStyleNumber);
+      const bundle = await fetchRestBundle(normalizedId); // Use B00060, not 5000
       const product = buildProductFromRest(normalizedId, bundle);
       return {
         product,
