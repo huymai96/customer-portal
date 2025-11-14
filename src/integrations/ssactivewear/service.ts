@@ -59,32 +59,35 @@ function createWarnings(errors: unknown[]): string[] | undefined {
 }
 
 /**
- * Fetch product data with PromoStandards → REST fallback.
+ * Fetch product data with REST primary, PromoStandards fallback.
+ * 
+ * NOTE: SSActivewear's PromoStandards Product Data service doesn't return
+ * colors/sizes/parts, so we use REST API as primary source.
  */
 export async function fetchProductWithFallback(productId: string): Promise<ProductResult> {
   const attemptErrors: unknown[] = [];
   const normalizedId = toSsaProductId(productId);
 
-  // Attempt 1: PromoStandards SOAP
-  try {
-    const xml = await getProduct({ productId: normalizedId });
-    const product = await parseProductXml(xml, normalizedId);
-    return {
-      product,
-      source: 'promostandards',
-      fetchedAt: new Date().toISOString(),
-    };
-  } catch (error) {
-    attemptErrors.push(error);
-  }
-
-  // Attempt 2: REST API v2
+  // Attempt 1: REST API v2 (primary for SSActivewear)
   try {
     const bundle = await fetchRestBundle(normalizedId);
     const product = buildProductFromRest(normalizedId, bundle);
     return {
       product,
       source: 'rest',
+      fetchedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    attemptErrors.push(error);
+  }
+
+  // Attempt 2: PromoStandards SOAP (fallback, limited data)
+  try {
+    const xml = await getProduct({ productId: normalizedId });
+    const product = await parseProductXml(xml, normalizedId);
+    return {
+      product,
+      source: 'promostandards',
       fetchedAt: new Date().toISOString(),
       warnings: createWarnings(attemptErrors),
     };
