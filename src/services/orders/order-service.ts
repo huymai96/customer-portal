@@ -140,9 +140,9 @@ function sanitizeQuantity(value: number, label: string): number {
   return Math.floor(parsed);
 }
 
-function toJsonValue(value?: unknown): Prisma.InputJsonValue | Prisma.NullTypes.JsonNull {
+function toJsonValue(value?: unknown): Prisma.InputJsonValue | undefined {
   if (value == null) {
-    return Prisma.JsonNull;
+    return undefined;
   }
   return value as Prisma.InputJsonValue;
 }
