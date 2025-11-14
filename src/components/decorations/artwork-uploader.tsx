@@ -11,6 +11,7 @@
  * - Multiple file support
  */
 
+import Image from 'next/image';
 import { useState, useRef } from 'react';
 import { ArrowUpTrayIcon, XMarkIcon, DocumentIcon } from '@heroicons/react/24/outline';
 
@@ -177,12 +178,15 @@ export function ArtworkUploader({ files, onFilesChange, maxFiles = 10 }: Artwork
               className="relative group rounded-lg border border-gray-200 p-3 hover:border-gray-300"
             >
               {/* Preview or Icon */}
-              <div className="aspect-square mb-2 rounded bg-gray-100 flex items-center justify-center overflow-hidden">
+              <div className="aspect-square mb-2 rounded bg-gray-100 flex items-center justify-center overflow-hidden relative">
                 {artworkFile.preview ? (
-                  <img
+                  <Image
                     src={artworkFile.preview}
                     alt={artworkFile.file.name}
-                    className="w-full h-full object-contain"
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    className="object-contain"
+                    unoptimized
                   />
                 ) : (
                   <DocumentIcon className="h-16 w-16 text-gray-400" />
