@@ -35,33 +35,48 @@ export function loadConfig(): SsaConfig {
  * Normalize a product ID to SSActivewear's format.
  * SSActivewear uses a "B" prefix + 5-digit style number (e.g., "B00060" for Gildan 5000).
  */
-export function toSsaProductId(productId: string): string {
-  const trimmed = productId.trim().toUpperCase();
+const B_PREFIX_STYLE = /^B\d{5}$/u;
+const DIGITS_ONLY = /^\d+$/u;
 
-  // Already has B prefix and looks valid
-  if (trimmed.startsWith('B') && trimmed.length >= 6) {
-    return trimmed;
-  }
-
-  // Extract digits only
-  const digits = trimmed.replace(/[^0-9]/gu, '');
-  if (digits.length === 0) {
-    return trimmed; // Return as-is if no digits found
-  }
-
-  // Pad to 5 digits and add B prefix
-  const paddedDigits =
-    digits.length >= 5
-      ? digits.slice(-5)
-      : digits.padStart(5, '0');
-
-  return `B${paddedDigits}`;
+function normalizeIdentifier(value: string): string {
+  return value.trim().toUpperCase();
 }
 
 /**
- * Convert SSActivewear product ID to style number (remove B prefix).
+ * Normalize an input into the supplier's internal part ID format.
+ * - If the caller already passes the B-prefixed ID, keep it.
+ * - If the caller passes only digits, pad to 5 and prefix with B.
+ * - If letters are present (e.g., A230), keep the value as-is because the API
+ *   expects that literal manufacturer style.
+ */
+export function toSsaProductId(productId: string): string {
+  const normalized = normalizeIdentifier(productId);
+  if (!normalized) {
+    throw new Error('Product ID is required');
+  }
+
+  if (B_PREFIX_STYLE.test(normalized)) {
+    return normalized;
+  }
+
+  if (DIGITS_ONLY.test(normalized)) {
+    return `B${normalized.padStart(5, '0')}`;
+  }
+
+  return normalized;
+}
+
+/**
+ * Convert supplier ID into the style key that S&S endpoints expect.
  */
 export function toStyleNumber(productId: string): string {
-  const normalized = toSsaProductId(productId);
-  return normalized.startsWith('B') ? normalized.slice(1) : normalized;
+  const normalized = normalizeIdentifier(productId);
+  if (B_PREFIX_STYLE.test(normalized)) {
+    return normalized.slice(1);
+  }
+  return normalized;
+}
+
+export function normalizeStyleLookupKey(productId: string): string {
+  return normalizeIdentifier(productId);
 }

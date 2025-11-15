@@ -1,23 +1,19 @@
-import { getProductBySupplierPartId } from '@/services/catalog-repository';
 import type { ProductRecord } from '@/lib/types';
 import {
-  fetchProductWithFallback,
-  isSsActivewearPart,
-} from '@/integrations/ssactivewear/service';
+  loadSupplierProducts,
+  type SupplierProductBundle,
+} from '@/services/supplier-product-loader';
 
 export async function getProductRecord(supplierPartId: string): Promise<ProductRecord> {
-  const normalized = supplierPartId.toUpperCase();
-  const record = await getProductBySupplierPartId(normalized);
-  if (record) {
-    return record;
+  const bundle = await loadSupplierProducts(supplierPartId);
+  if (bundle.primaryProduct) {
+    return bundle.primaryProduct;
   }
-
-  if (isSsActivewearPart(normalized)) {
-    const result = await fetchProductWithFallback(normalized);
-    return result.product;
-  }
-
   throw new Error(`Product ${supplierPartId} not found`);
 }
 
-
+export async function getSupplierProductBundle(
+  identifier: string
+): Promise<SupplierProductBundle> {
+  return loadSupplierProducts(identifier);
+}

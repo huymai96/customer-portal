@@ -1,4 +1,11 @@
-import type { ProductRecord, InventorySnapshot, QuoteRequest, QuoteResponse } from '@/lib/types';
+import type {
+  ProductRecord,
+  InventorySnapshot,
+  QuoteRequest,
+  QuoteResponse,
+  CanonicalSearchOptions,
+  CanonicalSearchResponse,
+} from '@/lib/types';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(path, {
@@ -36,11 +43,27 @@ export async function submitQuote(payload: QuoteRequest) {
   });
 }
 
-export async function searchProducts(query: string) {
+export async function searchProducts(query: string, options: CanonicalSearchOptions = {}) {
   const params = new URLSearchParams({ query });
-  return request<{ items: Array<{ supplierPartId: string; name: string; brand: string }> }>(
-    `/api/products/search?${params.toString()}`
-  );
+  if (typeof options.limit === 'number') {
+    params.set('limit', String(options.limit));
+  }
+  if (typeof options.offset === 'number') {
+    params.set('offset', String(options.offset));
+  }
+  if (options.sort) {
+    params.set('sort', options.sort);
+  }
+  if (options.inStockOnly) {
+    params.set('inStockOnly', 'true');
+  }
+  if (options.suppliers?.length) {
+    for (const supplier of options.suppliers) {
+      params.append('supplier', supplier);
+    }
+  }
+
+  return request<CanonicalSearchResponse>(`/api/products/search?${params.toString()}`);
 }
 
 

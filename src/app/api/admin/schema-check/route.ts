@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
+import { countCanonicalStyles, countSupplierProductLinks } from '@/services/canonical-style';
 
 export const runtime = 'nodejs';
 
@@ -11,17 +12,30 @@ export async function GET() {
       orderLines: 0,
       decorations: 0,
       artworks: 0,
+      canonicalStyles: 0,
+      supplierLinks: 0,
     };
 
     try {
-      checks.orders = await prisma.order.count();
-      checks.orderLines = await prisma.orderLine.count();
-      checks.decorations = await prisma.orderDecoration.count();
-      checks.artworks = await prisma.artworkAsset.count();
+      [
+        checks.orders,
+        checks.orderLines,
+        checks.decorations,
+        checks.artworks,
+        checks.canonicalStyles,
+        checks.supplierLinks,
+      ] = await Promise.all([
+        prisma.order.count(),
+        prisma.orderLine.count(),
+        prisma.orderDecoration.count(),
+        prisma.artworkAsset.count(),
+        countCanonicalStyles(prisma),
+        countSupplierProductLinks(prisma),
+      ]);
 
       return NextResponse.json({
         status: 'ok',
-        message: 'All decoration workflow tables exist',
+        message: 'Decoration workflow and canonical style tables exist',
         counts: checks,
       });
     } catch (error) {

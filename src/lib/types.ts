@@ -62,6 +62,55 @@ export type InventorySnapshot = {
   cacheStatus?: 'hit' | 'refreshed' | 'stale';
 };
 
+export type SupplierCode = 'SANMAR' | 'SSACTIVEWEAR';
+
+export interface CanonicalSupplierEntry {
+  supplier: SupplierCode;
+  supplierPartId: string;
+  brand?: string | null;
+}
+
+export interface CanonicalSearchResult {
+  canonicalStyleId: string | null;
+  styleNumber: string;
+  displayName: string;
+  brand?: string | null;
+  primarySupplier?: SupplierCode;
+  primarySupplierPartId: string;
+  suppliers: CanonicalSupplierEntry[];
+  price?: {
+    min?: number;
+    max?: number;
+    currency?: string;
+  };
+  availability?: {
+    suppliersInStock: number;
+    totalSuppliers: number;
+  };
+  primarySupplierInStock?: boolean;
+  score: number;
+}
+
+export interface CanonicalSearchMeta {
+  limit: number;
+  offset: number;
+  count: number;
+  total: number;
+}
+
+export interface CanonicalSearchResponse {
+  items: CanonicalSearchResult[];
+  meta: CanonicalSearchMeta;
+}
+
+export interface CanonicalSearchOptions {
+  limit?: number;
+  offset?: number;
+  suppliers?: SupplierCode[];
+  sort?: 'relevance' | 'supplier' | 'price' | 'stock';
+  inStockOnly?: boolean;
+}
+
 export type DecorationMethod = 'screen' | 'emb' | 'dtf' | 'heat' | 'dtg' | 'sublimation' | 'patch';
 
 export type DecorationArtworkType = 'design' | 'proof' | 'reference' | 'other';

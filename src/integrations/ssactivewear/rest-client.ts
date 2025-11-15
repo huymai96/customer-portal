@@ -7,7 +7,7 @@
  * API Documentation: https://api.ssactivewear.com/V2
  */
 
-import { loadConfig, toStyleNumber } from './config';
+import { loadConfig, normalizeStyleLookupKey, toStyleNumber } from './config';
 
 interface RestProduct {
   sku: string;
@@ -62,15 +62,60 @@ export interface RestBundle {
   style: RestStyle | null;
 }
 
+const RATE_LIMIT_MIN_REMAINING = 1;
+const RATE_LIMIT_DEFAULT_WAIT_MS = 1100;
+let nextAllowedAt = 0;
+
+class SsApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public payload: string,
+    public url: string
+  ) {
+    super(message);
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function buildAuthHeader(accountNumber: string, apiKey: string): string {
   const credentials = `${accountNumber}:${apiKey}`;
   return `Basic ${Buffer.from(credentials).toString('base64')}`;
+}
+
+async function enforceRateLimitWindow(): Promise<void> {
+  const now = Date.now();
+  if (now < nextAllowedAt) {
+    await sleep(nextAllowedAt - now);
+  }
+}
+
+function updateRateLimitWindow(response: Response): void {
+  const remainingHeader = response.headers.get('X-Rate-Limit-Remaining');
+  if (!remainingHeader) {
+    return;
+  }
+  const remaining = Number.parseFloat(remainingHeader);
+  if (!Number.isFinite(remaining) || remaining > RATE_LIMIT_MIN_REMAINING) {
+    return;
+  }
+  const resetHeader = response.headers.get('X-Rate-Limit-Reset');
+  const resetSeconds = resetHeader ? Number.parseFloat(resetHeader) : null;
+  const waitMs =
+    resetSeconds && Number.isFinite(resetSeconds) && resetSeconds > 0
+      ? Math.max(resetSeconds * 1000, RATE_LIMIT_DEFAULT_WAIT_MS)
+      : RATE_LIMIT_DEFAULT_WAIT_MS;
+  nextAllowedAt = Date.now() + waitMs;
 }
 
 async function fetchRest<T>(
   path: string,
   params: Record<string, string | undefined> = {}
 ): Promise<T> {
+  await enforceRateLimitWindow();
   const config = loadConfig();
   const base = config.restBaseUrl.endsWith('/')
     ? config.restBaseUrl
@@ -91,11 +136,15 @@ async function fetchRest<T>(
     cache: 'no-store',
     next: { revalidate: 0 },
   });
+  updateRateLimitWindow(response);
 
   if (!response.ok) {
     const payload = await response.text();
-    throw new Error(
-      `SSActivewear REST request failed: ${response.status} ${response.statusText} - ${payload}`
+    throw new SsApiError(
+      `SSActivewear REST request failed: ${response.status} ${response.statusText}`,
+      response.status,
+      payload,
+      url.toString()
     );
   }
 
@@ -103,39 +152,48 @@ async function fetchRest<T>(
 }
 
 /**
- * Fetch all products (SKUs) for a given style number or part number.
- * 
- * NOTE: SSActivewear uses different identifiers:
- * - `style` parameter searches by styleName (e.g., "5000" for Bella+Canvas)
- * - For Gildan products, we need to use partNumber (e.g., "00060" for Gildan 5000)
- * 
- * We try both approaches to maximize compatibility.
+ * Fetch all products (SKUs) for a given style identifier using the documented
+ * endpoints. We attempt direct /products/{style}, the partnumber query string,
+ * and finally fall back to the legacy style param for backwards compatibility.
  */
-export async function fetchRestProducts(identifier: string): Promise<RestProduct[]> {
-  // For identifiers that look like manufacturer style numbers (e.g., "5000"),
-  // convert to SSActivewear partNumber format first (e.g., "00060")
-  const partNumber = identifier.replace(/^B/i, '').padStart(5, '0');
+export async function fetchRestProducts(identifier: string | string[]): Promise<RestProduct[]> {
+  const rawKeys = Array.isArray(identifier) ? identifier : [identifier];
+  const uniqueKeys = Array.from(
+    new Set(
+      rawKeys
+        .map((key) => normalizeStyleLookupKey(key))
+        .filter((key) => Boolean(key))
+    )
+  );
 
-  // Try searching by partNumber first (most reliable for Gildan products)
-  try {
-    const data = await fetchRest<RestProduct[]>('/products', { style: partNumber });
-    if (Array.isArray(data) && data.length > 0) {
-      return data;
+  const attempts: Array<() => Promise<RestProduct[]>> = [];
+  let lastError: Error | null = null;
+
+  for (const key of uniqueKeys) {
+    attempts.push(() => fetchRest<RestProduct[]>('/products', { style: key }));
+    attempts.push(() => fetchRest<RestProduct[]>('/products', { partnumber: key }));
+    if (/^\d+$/u.test(key)) {
+      attempts.push(() => fetchRest<RestProduct[]>('/products', { styleid: key }));
     }
-    // If we got an empty array, don't return it yet - try the original identifier
-  } catch {
-    // PartNumber search failed with error, will try original identifier next
+    attempts.push(() => fetchRest<RestProduct[]>('/products', { search: key }));
   }
 
-  // If partNumber search returns empty or fails, try the original identifier
-  // This handles cases where the identifier is already in the correct format
-  try {
-    const data = await fetchRest<RestProduct[]>('/products', { style: identifier });
-    if (Array.isArray(data) && data.length > 0) {
-      return data;
+  for (const attempt of attempts) {
+    try {
+      const data = await attempt();
+      if (Array.isArray(data) && data.length > 0) {
+        return data;
+      }
+    } catch (error) {
+      if (error instanceof SsApiError && (error.status === 401 || error.status === 403)) {
+        throw error;
+      }
+      lastError = error instanceof Error ? error : new Error(String(error));
     }
-  } catch {
-    // Both attempts failed
+  }
+
+  if (lastError) {
+    throw lastError;
   }
 
   return [];
@@ -149,28 +207,39 @@ export async function fetchRestStyle(
   hints?: RestStyleHints
 ): Promise<RestStyle | null> {
   const candidates: RestStyle[] = [];
-  const partNumber = identifier.replace(/^B/i, '').padStart(5, '0');
+  const lookupKey = normalizeStyleLookupKey(identifier);
+  const attempts: Array<() => Promise<RestStyle | RestStyle[] | null>> = [
+    () => fetchRest<RestStyle | RestStyle[] | null>(`/styles/${encodeURIComponent(lookupKey)}`),
+    () => fetchRest<RestStyle[] | null>('/styles', { partnumber: lookupKey }),
+  ];
 
-  // Try searching by partNumber first
-  try {
-    const data = await fetchRest<RestStyle[]>('/styles', { style: partNumber });
-    if (Array.isArray(data) && data.length > 0) {
-      candidates.push(...data);
-    }
-  } catch {
-    // Ignore and try fallback
+  if (/^\d+$/u.test(lookupKey)) {
+    attempts.push(() => fetchRest<RestStyle[] | null>('/styles', { styleid: lookupKey }));
   }
 
-  // Try with original identifier if we still don't have a match
-  if (candidates.length === 0 || partNumber !== identifier) {
+  attempts.push(() => fetchRest<RestStyle[] | null>('/styles', { search: lookupKey }));
+  let lastError: Error | null = null;
+
+  for (const attempt of attempts) {
     try {
-      const data = await fetchRest<RestStyle[]>('/styles', { style: identifier });
-      if (Array.isArray(data) && data.length > 0) {
-        candidates.push(...data);
+      const data = await attempt();
+      if (!data) {
+        continue;
       }
-    } catch {
-      // Ignore
+      const list = Array.isArray(data) ? data : [data];
+      if (list.length > 0) {
+        candidates.push(...list);
+      }
+    } catch (error) {
+      if (error instanceof SsApiError && (error.status === 401 || error.status === 403)) {
+        throw error;
+      }
+      lastError = error instanceof Error ? error : new Error(String(error));
     }
+  }
+
+  if (candidates.length === 0 && lastError) {
+    throw lastError;
   }
 
   if (candidates.length === 0) {
@@ -185,14 +254,31 @@ export async function fetchRestStyle(
  */
 export async function fetchRestBundle(productId: string): Promise<RestBundle> {
   const styleNumber = toStyleNumber(productId);
-  const products = await fetchRestProducts(styleNumber);
+  const lookupKeys = new Set<string>();
+  addLookupValue(lookupKeys, styleNumber);
+
+  const initialStyle = await fetchRestStyle(styleNumber).catch(() => null);
+  if (initialStyle) {
+    addLookupValue(lookupKeys, initialStyle.partNumber);
+    addLookupValue(lookupKeys, initialStyle.styleID);
+    addLookupValue(
+      lookupKeys,
+      initialStyle.brandName && initialStyle.styleName
+        ? `${initialStyle.brandName} ${initialStyle.styleName}`
+        : null
+    );
+  }
+
+  const products = await fetchRestProducts(Array.from(lookupKeys));
   const primaryProduct = products[0];
 
-  const style = await fetchRestStyle(styleNumber, {
-    styleId: primaryProduct?.styleID,
-    brandName: primaryProduct?.brandName,
-    styleName: primaryProduct?.styleName,
-  }).catch(() => null);
+  const style =
+    initialStyle ??
+    (await fetchRestStyle(styleNumber, {
+      styleId: primaryProduct?.styleID,
+      brandName: primaryProduct?.brandName,
+      styleName: primaryProduct?.styleName,
+    }).catch(() => null));
 
   return { products, style };
 }
@@ -227,5 +313,15 @@ function selectMatchingStyle(styles: RestStyle[], hints?: RestStyleHints): RestS
   }
 
   return styles[0];
+}
+
+function addLookupValue(target: Set<string>, value: unknown): void {
+  if (value == null) {
+    return;
+  }
+  const normalized = normalizeStyleLookupKey(String(value));
+  if (normalized) {
+    target.add(normalized);
+  }
 }
 

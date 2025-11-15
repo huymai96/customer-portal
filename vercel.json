@@ -1,0 +1,13 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-ssactivewear-incremental",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/sync-ssactivewear-inventory",
+      "schedule": "0 */4 * * *"
+    }
+  ]
+}
+

@@ -1,0 +1,32 @@
+[
+  {
+    "styleNumber": "5000",
+    "displayName": "Gildan Heavy Cotton Tee",
+    "brand": "Gildan",
+    "links": [
+      { "supplier": "SANMAR", "supplierPartId": "G500" },
+      { "supplier": "SANMAR", "supplierPartId": "5000" },
+      { "supplier": "SSACTIVEWEAR", "supplierPartId": "B00060" }
+    ]
+  },
+  {
+    "styleNumber": "1717",
+    "displayName": "Comfort Colors Heavyweight Tee",
+    "brand": "Comfort Colors",
+    "links": [
+      { "supplier": "SANMAR", "supplierPartId": "1717" },
+      { "supplier": "SANMAR", "supplierPartId": "C1717" },
+      { "supplier": "SSACTIVEWEAR", "supplierPartId": "B01717" }
+    ]
+  },
+  {
+    "styleNumber": "PC54",
+    "displayName": "Port & Company Core Cotton Tee",
+    "brand": "Port & Company",
+    "links": [
+      { "supplier": "SANMAR", "supplierPartId": "PC54" },
+      { "supplier": "SANMAR", "supplierPartId": "PC54T" }
+    ]
+  }
+]
+

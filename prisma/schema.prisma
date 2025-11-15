@@ -103,6 +103,30 @@ model ProductInventory {
   @@index([supplierPartId])
 }
 
+model CanonicalStyle {
+  id            String                 @id @default(uuid())
+  styleNumber   String                 @unique
+  displayName   String
+  brand         String?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  supplierLinks SupplierProductLink[]
+}
+
+model SupplierProductLink {
+  id               String          @id @default(uuid())
+  canonicalStyleId String
+  supplier         SupplierSource
+  supplierPartId   String
+  metadata         Json?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  canonicalStyle   CanonicalStyle  @relation(fields: [canonicalStyleId], references: [id], onDelete: Cascade)
+
+  @@unique([supplier, supplierPartId])
+  @@index([canonicalStyleId])
+}
+
 enum OrderStatus {
   DRAFT
   QUOTED
@@ -127,6 +151,11 @@ enum ArtworkAssetType {
   PROOF
   REFERENCE
   OTHER
+}
+
+enum SupplierSource {
+  SANMAR
+  SSACTIVEWEAR
 }
 
 model Order {

@@ -5,7 +5,15 @@
  */
 
 import { decode } from 'he';
-import type { InventorySnapshot, ProductRecord, ProductColorway, ProductSize, ProductMediaGroup, ProductSkuMapEntry } from '@/lib/types';
+import type {
+  InventorySnapshot,
+  ProductRecord,
+  ProductColorway,
+  ProductSize,
+  ProductMediaGroup,
+  ProductSkuMapEntry,
+  ProductInventorySummary,
+} from '@/lib/types';
 import type { RestBundle } from './rest-client';
 
 function sanitizeCode(input: string, fallback: string): string {
@@ -43,6 +51,9 @@ export function buildProductFromRest(productId: string, bundle: RestBundle): Pro
   const colors = new Map<string, ProductColorway>();
   const sizes = new Map<string, ProductSize>();
   const skuMap = new Map<string, ProductSkuMapEntry>();
+  const inventoryMap = new Map<string, number>();
+  let minPiecePrice: number | null = null;
+  let maxPiecePrice: number | null = null;
   const mediaMap = new Map<string, Set<string>>();
 
   const firstProduct = bundle.products[0];
@@ -106,6 +117,19 @@ export function buildProductFromRest(productId: string, bundle: RestBundle): Pro
       }
     }
     mediaMap.set(colorCode, mediaSet);
+
+    const qty = computeTotalQuantity(product);
+    if (qty > 0) {
+      inventoryMap.set(mapKey, (inventoryMap.get(mapKey) ?? 0) + qty);
+    }
+
+    const priceCandidate = toNumber(
+      product.customerPrice ?? product.salePrice ?? product.piecePrice ?? product.mapPrice
+    );
+    if (priceCandidate != null) {
+      minPiecePrice = minPiecePrice == null ? priceCandidate : Math.min(minPiecePrice, priceCandidate);
+      maxPiecePrice = maxPiecePrice == null ? priceCandidate : Math.max(maxPiecePrice, priceCandidate);
+    }
   }
 
   const defaultColor = colors.values().next().value?.colorCode || 'DEFAULT';
@@ -116,6 +140,26 @@ export function buildProductFromRest(productId: string, bundle: RestBundle): Pro
       urls: Array.from(urls),
     })
   );
+
+  const inventory: ProductInventorySummary[] = Array.from(inventoryMap.entries()).map(
+    ([key, totalQty]) => {
+      const [colorCode, sizeCode] = key.split('::');
+      return {
+        colorCode,
+        sizeCode,
+        totalQty,
+        fetchedAt: new Date().toISOString(),
+      };
+    }
+  );
+
+  const attributes: Record<string, unknown> = {};
+  if (minPiecePrice != null) {
+    attributes.piecePrice = minPiecePrice;
+  }
+  if (maxPiecePrice != null && maxPiecePrice !== minPiecePrice) {
+    attributes.maxPiecePrice = maxPiecePrice;
+  }
 
   return {
     id: productId,
@@ -128,6 +172,8 @@ export function buildProductFromRest(productId: string, bundle: RestBundle): Pro
     media: mediaGroups,
     skuMap: Array.from(skuMap.values()),
     description,
+    inventory: inventory.length ? inventory : undefined,
+    attributes: Object.keys(attributes).length ? attributes : undefined,
   };
 }
 
@@ -174,5 +220,33 @@ export function buildInventoryFromRest(
     bySize,
     fetchedAt: new Date().toISOString(),
   };
+}
+
+function computeTotalQuantity(product: RestBundle['products'][number]): number {
+  if (product.warehouses && Array.isArray(product.warehouses)) {
+    return product.warehouses.reduce((sum, warehouse) => {
+      const qty = Number.parseInt(String(warehouse.qty ?? 0), 10) || 0;
+      return sum + qty;
+    }, 0);
+  }
+  if (product.qty != null) {
+    return Number.parseInt(String(product.qty), 10) || 0;
+  }
+  return 0;
+}
+
+function toNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.replace(/[^0-9.]/gu, '');
+    if (!normalized) {
+      return null;
+    }
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
 }
 

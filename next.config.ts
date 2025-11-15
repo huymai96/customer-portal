@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'cdn.sanmar.com' },
       { protocol: 'https', hostname: 'images.promosink.com' },
       { protocol: 'https', hostname: 'img.promosink.com' },
+      { protocol: 'https', hostname: 'cdn.ssactivewear.com' },
+      { protocol: 'https', hostname: 'ssactivewear.com' },
     ],
   },
 };

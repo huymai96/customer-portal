@@ -9,7 +9,12 @@
     "lint": "eslint",
     "postinstall": "prisma generate",
     "ingest:ssa:catalog": "tsx scripts/ingest-ssactivewear-catalog.ts",
-    "ingest:ssa:inventory": "tsx scripts/ingest-ssactivewear-inventory.ts"
+    "sync:ssa:full": "tsx scripts/sync-ssactivewear-full-catalog.ts",
+    "sync:ssa:incremental": "tsx scripts/sync-ssactivewear-incremental.ts",
+    "sync:ssa:inventory": "tsx scripts/sync-ssactivewear-inventory.ts",
+    "ingest:ssa:inventory": "tsx scripts/ingest-ssactivewear-inventory.ts",
+    "seed:canonical": "tsx scripts/seed-canonical-styles.ts --apply",
+    "link:style": "tsx scripts/link-style.ts"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.12.0",

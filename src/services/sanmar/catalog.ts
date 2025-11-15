@@ -1,6 +1,7 @@
-import { Prisma, PrismaClient, Product } from '@prisma/client';
+import { Prisma, PrismaClient, Product, SupplierSource } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
+import { ensureCanonicalStyleLink, guessCanonicalStyleNumber } from '@/services/canonical-style';
 
 const DEFAULT_CATALOG_ENDPOINT = 'https://ws.sanmar.com/ps/api/v2/catalog';
 const DEFAULT_PAGE_SIZE = Number.parseInt(process.env.SANMAR_CATALOG_PAGE_SIZE ?? '100', 10);
@@ -536,6 +537,18 @@ async function upsertProduct(
       skipDuplicates: true,
     });
   }
+
+  await ensureCanonicalStyleLink(tx, {
+    supplier: SupplierSource.SANMAR,
+    supplierPartId: product.supplierPartId,
+    styleNumber: guessCanonicalStyleNumber({
+      supplier: SupplierSource.SANMAR,
+      supplierPartId: product.supplierPartId,
+      brand: product.brand ?? undefined,
+    }),
+    displayName: product.name,
+    brand: product.brand ?? undefined,
+  });
 
   return status;
 }

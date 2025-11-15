@@ -8,8 +8,11 @@
  */
 
 import 'tsconfig-paths/register';
+import { SupplierSource } from '@prisma/client';
+
 import { fetchProductWithFallback } from '@/integrations/ssactivewear/service';
 import { prisma } from '@/lib/prisma';
+import { ensureCanonicalStyleLink, guessCanonicalStyleNumber } from '@/services/canonical-style';
 
 interface CliOptions {
   productIds: string[];
@@ -126,6 +129,19 @@ async function ingestProduct(productId: string): Promise<void> {
         })),
       },
     },
+  });
+
+  await ensureCanonicalStyleLink(prisma, {
+    supplier: SupplierSource.SSACTIVEWEAR,
+    supplierPartId: product.supplierPartId,
+    styleNumber: guessCanonicalStyleNumber({
+      supplier: SupplierSource.SSACTIVEWEAR,
+      supplierPartId: product.supplierPartId,
+      brand: product.brand ?? undefined,
+      metadata: product.attributes ?? undefined,
+    }),
+    displayName: product.name,
+    brand: product.brand || undefined,
   });
 
   console.log(`[${productId}] Success: ${product.colors.length} colors, ${product.sizes.length} sizes`);

@@ -1,11 +1,11 @@
 import { notFound } from 'next/navigation';
 
+import { SupplierSource } from '@prisma/client';
 import { ProjectCartProvider } from '@/components/projects/project-cart-context';
 import { ProductDetail } from '@/components/catalog/product-detail';
 import { ProjectCartPanel } from '@/components/projects/project-cart-panel';
 import { SupplierComparison } from '@/components/catalog/supplier-comparison';
-import { getProductBySupplierPartId } from '@/services/catalog-repository';
-import { fetchProductWithFallback, isSsActivewearPart } from '@/integrations/ssactivewear/service';
+import { getSupplierProductBundle } from '@/lib/server-api';
 
 interface CatalogProductPageProps {
   params: Promise<{ productId: string }>;
@@ -13,19 +13,10 @@ interface CatalogProductPageProps {
 
 export default async function CatalogProductPage({ params }: CatalogProductPageProps) {
   const { productId } = await params;
-  const supplierPartId = decodeURIComponent(productId).toUpperCase();
+  const supplierPartId = decodeURIComponent(productId);
 
-  const [sanmarProduct, ssActivewearResult] = await Promise.all([
-    getProductBySupplierPartId(supplierPartId).catch(() => null),
-    isSsActivewearPart(supplierPartId)
-      ? fetchProductWithFallback(supplierPartId).catch((error) => {
-          console.error('Failed to load SSActivewear fallback product', supplierPartId, error);
-          return null;
-        })
-      : Promise.resolve(null),
-  ]);
-
-  const product = sanmarProduct ?? ssActivewearResult?.product ?? null;
+  const bundle = await getSupplierProductBundle(supplierPartId);
+  const product = bundle.primaryProduct;
 
   if (!product) {
     notFound();
@@ -39,8 +30,8 @@ export default async function CatalogProductPage({ params }: CatalogProductPageP
         </section>
         <section className="page-section">
           <SupplierComparison
-            sanmar={sanmarProduct}
-            ssactivewear={ssActivewearResult?.product ?? null}
+            sanmar={bundle.products[SupplierSource.SANMAR] ?? null}
+            ssactivewear={bundle.products[SupplierSource.SSACTIVEWEAR] ?? null}
           />
         </section>
         <section className="page-section">
