@@ -42,6 +42,7 @@ interface RestProduct {
 
 interface RestStyle {
   styleID?: number | string;
+  partNumber?: string;
   styleName?: string;
   brandName?: string;
   title?: string;

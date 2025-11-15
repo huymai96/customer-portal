@@ -109,7 +109,7 @@ async function syncStyle(style: SsaStyle): Promise<void> {
 
   // Group products by color and size
   const colors = new Map<string, { colorName: string; colorCode: string; swatchUrl?: string }>();
-  const sizes = new Map<string, { code: string; display: string; sort: number }>();
+  const sizes = new Map<string, { sizeCode: string; display: string; sort: number }>();
   const skuMap: Array<{ colorCode: string; sizeCode: string; supplierSku: string }> = [];
   const mediaMap = new Map<string, Set<string>>();
 
@@ -131,7 +131,7 @@ async function syncStyle(style: SsaStyle): Promise<void> {
     
     if (!sizes.has(sizeCode)) {
       sizes.set(sizeCode, {
-        code: sizeCode,
+        sizeCode: sizeCode,
         display: sizeName,
         sort: sizeOrder,
       });

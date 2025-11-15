@@ -68,7 +68,7 @@ async function syncStyle(style: SsaStyle): Promise<void> {
   }
 
   const colors = new Map<string, { colorName: string; colorCode: string; swatchUrl?: string }>();
-  const sizes = new Map<string, { code: string; display: string; sort: number }>();
+  const sizes = new Map<string, { sizeCode: string; display: string; sort: number }>();
   const skuMap: Array<{ colorCode: string; sizeCode: string; supplierSku: string }> = [];
   const mediaMap = new Map<string, Set<string>>();
 
@@ -85,7 +85,7 @@ async function syncStyle(style: SsaStyle): Promise<void> {
     const sizeOrder = Number.parseInt(String(product.sizeOrder || 0), 10) || 0;
     
     if (!sizes.has(sizeCode)) {
-      sizes.set(sizeCode, { code: sizeCode, display: sizeName, sort: sizeOrder });
+      sizes.set(sizeCode, { sizeCode: sizeCode, display: sizeName, sort: sizeOrder });
     }
 
     skuMap.push({ colorCode, sizeCode, supplierSku: product.sku });
