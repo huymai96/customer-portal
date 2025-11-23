@@ -1,14 +1,16 @@
 'use client';
 
 import clsx from 'clsx';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
+import { getSwatchUrlWithFallback } from '@/lib/catalog/swatch-url-generator';
 import type { ColorOption } from './types';
 
 interface ColorSwatchesProps {
   colors?: ColorOption[];
   selectedColorCode: string | null;
   onSelectColor: (colorCode: string) => void;
+  styleCode?: string; // e.g., "PC54"
 }
 
 // Comprehensive color mapping for common apparel colors
@@ -164,7 +166,9 @@ function getColorHex(colorCode: string, colorName?: string | null): string {
   return '#CBD5F5';
 }
 
-export function ColorSwatches({ colors = [], selectedColorCode, onSelectColor }: ColorSwatchesProps) {
+export function ColorSwatches({ colors = [], selectedColorCode, onSelectColor, styleCode }: ColorSwatchesProps) {
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  
   const sortedColors = useMemo(() => {
     return [...colors].sort((a, b) => {
       const aLabel = (a.colorName ?? a.colorCode).toUpperCase();
@@ -183,15 +187,8 @@ export function ColorSwatches({ colors = [], selectedColorCode, onSelectColor }:
   const selectedColor = colors.find(c => c.colorCode === selectedColorCode);
   const selectedDisplayName = selectedColor?.colorName || selectedColorCode;
 
-  // SanMar swatch image base URL
-  const getSwatchImageUrl = (swatchUrl: string | null | undefined): string | undefined => {
-    if (!swatchUrl) return undefined;
-    // If already a full URL, return it
-    if (swatchUrl.startsWith('http://') || swatchUrl.startsWith('https://')) {
-      return swatchUrl;
-    }
-    // Otherwise prepend SanMar CDN URL
-    return `https://www.sanmar.com/swatches/color/${swatchUrl}`;
+  const handleImageError = (colorCode: string) => {
+    setFailedImages(prev => new Set([...prev, colorCode]));
   };
 
   return (
@@ -215,7 +212,12 @@ export function ColorSwatches({ colors = [], selectedColorCode, onSelectColor }:
         {sortedColors.map((color) => {
           const isSelected = selectedColorCode === color.colorCode;
           const displayName = color.colorName ?? color.colorCode;
-          const swatchImageUrl = getSwatchImageUrl(color.swatchUrl);
+          const imageFailed = failedImages.has(color.colorCode);
+          
+          // Get swatch URL with intelligent fallback
+          const swatchImageUrl = !imageFailed && styleCode
+            ? getSwatchUrlWithFallback(color.swatchUrl, styleCode, color.colorCode, color.colorName)
+            : undefined;
           
           return (
             <button
@@ -229,14 +231,22 @@ export function ColorSwatches({ colors = [], selectedColorCode, onSelectColor }:
                   : 'border-slate-300 hover:border-brand-400'
               )}
               style={{
-                backgroundImage: swatchImageUrl ? `url(${swatchImageUrl})` : undefined,
-                backgroundColor: swatchImageUrl ? undefined : getColorHex(color.colorCode, color.colorName),
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
+                backgroundColor: imageFailed || !swatchImageUrl 
+                  ? getColorHex(color.colorCode, color.colorName)
+                  : undefined,
               }}
               title={`${displayName} (${color.colorCode})`}
               aria-label={`Select ${displayName}`}
             >
+              {swatchImageUrl && !imageFailed && (
+                <img
+                  src={swatchImageUrl}
+                  alt={displayName}
+                  className="h-full w-full rounded-full object-cover"
+                  onError={() => handleImageError(color.colorCode)}
+                  loading="lazy"
+                />
+              )}
               {isSelected && (
                 <div className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-500 shadow-md">
                   <svg

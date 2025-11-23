@@ -150,6 +150,7 @@ export function SupplierSection({
             colors={colorOptions}
             selectedColorCode={activeColor}
             onSelectColor={handleColorSelect}
+            styleCode={supplier.supplierPartId}
           />
           <SizeQuantitySelector
             sizes={sizeOptions}
