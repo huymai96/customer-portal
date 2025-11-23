@@ -261,19 +261,25 @@ function SearchCard({
           <div className="flex items-center gap-2">
             <p className="text-xs font-semibold text-slate-600">Colors:</p>
             <div className="flex gap-1.5 overflow-x-auto">
-              {item.colors.slice(0, 12).map((color) => (
-                <div
-                  key={color.colorCode}
-                  className="h-8 w-8 flex-shrink-0 rounded-full border-2 border-white shadow-sm ring-1 ring-slate-200"
-                  style={{
-                    backgroundImage: color.swatchUrl ? `url(${color.swatchUrl})` : undefined,
-                    backgroundColor: color.swatchUrl ? undefined : getColorHex(color.colorCode, color.colorName),
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                  }}
-                  title={`${color.colorName ?? color.colorCode}`}
-                />
-              ))}
+              {item.colors.slice(0, 12).map((color) => {
+                const swatchImageUrl = color.swatchUrl && !color.swatchUrl.startsWith('http') 
+                  ? `https://www.sanmar.com/swatches/color/${color.swatchUrl}`
+                  : color.swatchUrl;
+                
+                return (
+                  <div
+                    key={color.colorCode}
+                    className="h-8 w-8 flex-shrink-0 rounded-full border-2 border-white shadow-sm ring-1 ring-slate-200"
+                    style={{
+                      backgroundImage: swatchImageUrl ? `url(${swatchImageUrl})` : undefined,
+                      backgroundColor: swatchImageUrl ? undefined : getColorHex(color.colorCode, color.colorName),
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }}
+                    title={`${color.colorName ?? color.colorCode}`}
+                  />
+                );
+              })}
               {item.colors.length > 12 && (
                 <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
                   +{item.colors.length - 12}

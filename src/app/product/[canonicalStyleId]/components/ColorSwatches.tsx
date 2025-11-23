@@ -183,6 +183,17 @@ export function ColorSwatches({ colors = [], selectedColorCode, onSelectColor }:
   const selectedColor = colors.find(c => c.colorCode === selectedColorCode);
   const selectedDisplayName = selectedColor?.colorName || selectedColorCode;
 
+  // SanMar swatch image base URL
+  const getSwatchImageUrl = (swatchUrl: string | null | undefined): string | undefined => {
+    if (!swatchUrl) return undefined;
+    // If already a full URL, return it
+    if (swatchUrl.startsWith('http://') || swatchUrl.startsWith('https://')) {
+      return swatchUrl;
+    }
+    // Otherwise prepend SanMar CDN URL
+    return `https://www.sanmar.com/swatches/color/${swatchUrl}`;
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-baseline gap-2">
@@ -204,6 +215,7 @@ export function ColorSwatches({ colors = [], selectedColorCode, onSelectColor }:
         {sortedColors.map((color) => {
           const isSelected = selectedColorCode === color.colorCode;
           const displayName = color.colorName ?? color.colorCode;
+          const swatchImageUrl = getSwatchImageUrl(color.swatchUrl);
           
           return (
             <button
@@ -217,8 +229,8 @@ export function ColorSwatches({ colors = [], selectedColorCode, onSelectColor }:
                   : 'border-slate-300 hover:border-brand-400'
               )}
               style={{
-                backgroundImage: color.swatchUrl ? `url(${color.swatchUrl})` : undefined,
-                backgroundColor: color.swatchUrl ? undefined : getColorHex(color.colorCode, color.colorName),
+                backgroundImage: swatchImageUrl ? `url(${swatchImageUrl})` : undefined,
+                backgroundColor: swatchImageUrl ? undefined : getColorHex(color.colorCode, color.colorName),
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
               }}
