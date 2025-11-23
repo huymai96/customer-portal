@@ -11,6 +11,7 @@ import {
   type OrderRequest,
 } from '@/lib/orders/service';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { type DecorationLocation } from '@/lib/decoration/pricing';
 
 interface CartData {
   externalOrderId?: string;
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
         unitPrice: item.unitPrice,
         decorations: item.decorations?.map((dec) => ({
           method: dec.method as 'screen_print' | 'embroidery' | 'dtg',
-          location: dec.location as any, // Type assertion for location
+          location: dec.location as DecorationLocation,
           description: dec.description,
           artworkUrl: dec.artworkUrl,
           colors: dec.colors,
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
           height: dec.height,
           setupFee: dec.setupFee,
           unitCost: dec.unitCost,
-        })) || [],
+        })),
       })),
       shipping: {
         method: cartData.shipping?.method || cartData.shippingMethod || 'ground',
