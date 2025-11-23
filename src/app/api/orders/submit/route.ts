@@ -87,7 +87,18 @@ export async function POST(request: NextRequest) {
         size: item.size,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        decorations: item.decorations || [],
+        decorations: item.decorations?.map((dec) => ({
+          method: dec.method as 'screen_print' | 'embroidery' | 'dtg',
+          location: dec.location as any, // Type assertion for location
+          description: dec.description,
+          artworkUrl: dec.artworkUrl,
+          colors: dec.colors,
+          stitches: dec.stitches,
+          width: dec.width,
+          height: dec.height,
+          setupFee: dec.setupFee,
+          unitCost: dec.unitCost,
+        })) || [],
       })),
       shipping: {
         method: cartData.shipping?.method || cartData.shippingMethod || 'ground',
