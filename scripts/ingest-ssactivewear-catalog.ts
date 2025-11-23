@@ -11,6 +11,7 @@ import 'tsconfig-paths/register';
 import { SupplierSource } from '@prisma/client';
 
 import { fetchProductWithFallback } from '@/integrations/ssactivewear/service';
+import { listAllSsStyles } from '@/integrations/ssactivewear/style-list';
 import { prisma } from '@/lib/prisma';
 import { ensureCanonicalStyleLink, guessCanonicalStyleNumber } from '@/services/canonical-style';
 
@@ -151,8 +152,24 @@ async function main() {
   const options = parseArgs();
 
   if (options.fetchAll) {
-    console.error('--all mode not yet implemented. Please specify product IDs.');
-    process.exit(1);
+    const allStyles = await listAllSsStyles();
+    console.log(`Found ${allStyles.length} S&S styles to ingest.`);
+
+    let processed = 0;
+    for (const styleId of allStyles) {
+      try {
+        await ingestProduct(styleId);
+      } catch (error) {
+        console.error(`[${styleId}] Failed:`, error);
+      }
+      processed += 1;
+      if (processed % 50 === 0) {
+        console.log(`Progress: ${processed}/${allStyles.length}`);
+      }
+    }
+
+    console.log('Catalog ingest (--all) complete.');
+    return;
   }
 
   if (options.productIds.length === 0) {

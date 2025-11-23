@@ -1,4 +1,11 @@
 import path from 'path';
+import { config } from 'dotenv';
+
+const envFiles = ['.env.local', '.env'];
+for (const envFile of envFiles) {
+  const envPath = path.resolve(process.cwd(), envFile);
+  config({ path: envPath, override: false });
+}
 
 import { importSanmarCatalog } from '../src/services/sanmar/importer';
 

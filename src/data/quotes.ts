@@ -14,18 +14,30 @@ export async function createQuote(payload: QuoteRequest): Promise<QuoteResponse>
 
   const normalizedLines: QuoteLineResponse[] = await Promise.all(
     payload.lines.map(async (line) => {
-      const baseBlankCost = await getProductBaseBlankCost(line.supplierPartId);
+      const supplierPartId = line.supplierPartId ?? line.supplierStyle ?? line.canonicalSku;
+      if (!supplierPartId) {
+        throw new Error('Quote line missing supplier part identifier');
+      }
+      const lineQty = line.qty ?? line.quantity ?? 0;
+      if (lineQty <= 0) {
+        throw new Error('Quote line quantity must be greater than zero');
+      }
+
+      const baseBlankCost = await getProductBaseBlankCost(supplierPartId);
       const pricing = calculateLinePricing({
-        supplierPartId: line.supplierPartId,
+        supplierPartId,
         colorCode: line.colorCode,
         sizeCode: line.sizeCode,
-        qty: line.qty,
+        qty: lineQty,
         decoration: line.decoration ?? null,
         baseBlankCost: baseBlankCost ?? undefined,
       });
 
       return {
         ...line,
+        supplierPartId,
+        qty: lineQty,
+        quantity: line.quantity ?? lineQty,
         pricing,
       };
     })

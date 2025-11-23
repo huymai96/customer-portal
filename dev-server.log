@@ -1,0 +1,14 @@
+
+> customer-portal@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.5.6
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.5.16:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 4.1s
+ ○ Compiling /api/health ...
+ ✓ Compiled /api/health in 3.7s (295 modules)
+ GET /api/health 200 in 4047ms

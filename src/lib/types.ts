@@ -139,12 +139,54 @@ export interface DecorationSpec {
 }
 
 export interface CartLine {
-  supplierPartId: string;
+  id: string;
+  canonicalSku?: string;
+  supplier?: SupplierCode;
+  supplierStyle?: string;
+  supplierPartId?: string;
   colorCode: string;
   sizeCode: string;
-  qty: number;
+  quantity: number;
+  qty?: number;
+  unitCost?: number;
   decoration?: DecorationSpec | null;
   supplierSku?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CartSizeQuantity {
+  sizeCode: string;
+  quantity: number;
+}
+
+export interface PersistentCartLine {
+  id: string;
+  canonicalStyleId: string;
+  styleNumber: string;
+  displayName?: string | null;
+  brand?: string | null;
+  supplier: SupplierCode;
+  supplierPartId: string;
+  colorCode: string;
+  colorName?: string | null;
+  sizeQuantities: CartSizeQuantity[];
+}
+
+export interface CartResponsePayload {
+  cartId: string | null;
+  lines: PersistentCartLine[];
+}
+
+export interface AddToCartRequestPayload {
+  canonicalStyleId: string;
+  styleNumber: string;
+  displayName?: string | null;
+  brand?: string | null;
+  supplier: SupplierCode;
+  supplierPartId: string;
+  colorCode: string;
+  colorName?: string | null;
+  sizeQuantities: CartSizeQuantity[];
 }
 
 export interface DecorationOrderLineInput {

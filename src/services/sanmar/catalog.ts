@@ -2,40 +2,15 @@ import { Prisma, PrismaClient, Product, SupplierSource } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
 import { ensureCanonicalStyleLink, guessCanonicalStyleNumber } from '@/services/canonical-style';
+import { invokeSoapOperation } from '@/lib/sanmar/soapClient';
+import type { GenericSoapClient } from '@/lib/sanmar/soapClient';
 
-const DEFAULT_CATALOG_ENDPOINT = 'https://ws.sanmar.com/ps/api/v2/catalog';
 const DEFAULT_PAGE_SIZE = Number.parseInt(process.env.SANMAR_CATALOG_PAGE_SIZE ?? '100', 10);
 
 type UnknownRecord = Record<string, unknown>;
 
 interface CatalogPageCursor {
   pageNumber: number;
-}
-
-interface PromoStandardsCatalogResponse {
-  products?: unknown;
-  Products?: unknown;
-  Product?: unknown;
-  data?: {
-    products?: unknown;
-    Products?: unknown;
-    Product?: unknown;
-  };
-  result?: {
-    products?: unknown;
-    Products?: unknown;
-    Product?: unknown;
-  };
-  pagination?: {
-    nextPage?: number | string | null;
-    pageNumber?: number;
-    totalPages?: number;
-  };
-  PageInfo?: {
-    NextPage?: number | string | null;
-    PageNumber?: number;
-    TotalPages?: number;
-  };
 }
 
 interface NormalizedProduct {
@@ -74,20 +49,14 @@ export interface SanmarCatalogSyncOptions {
   pageSize?: number;
   maxPages?: number;
   dryRun?: boolean;
+  soapClient?: GenericSoapClient;
+  soapOperation?: string;
 }
 
 interface CatalogPageResult {
   items: NormalizedProduct[];
   nextCursor: CatalogPageCursor | null;
   rawCount: number;
-}
-
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required environment variable ${name}`);
-  }
-  return value;
 }
 
 function toArray<T>(value: T | T[] | null | undefined): T[] {
@@ -308,128 +277,104 @@ function normalizeProduct(record: UnknownRecord): NormalizedProduct | null {
   };
 }
 
-function extractProducts(payload: PromoStandardsCatalogResponse): UnknownRecord[] {
-  const candidates = [
-    payload.products,
-    payload.Products,
-    payload.Product,
-    payload.data?.products,
-    payload.data?.Products,
-    payload.data?.Product,
-    payload.result?.products,
-    payload.result?.Products,
-    payload.result?.Product,
+function getEnvOrDefault(name: string, fallback: string): string {
+  return process.env[name]?.trim() || fallback;
+}
+
+function wrapRequestBody(requestKey: string, body: Record<string, unknown>) {
+  if (requestKey === '__root__') {
+    return body;
+  }
+  return { [requestKey]: body };
+}
+
+function getNestedValue(source: unknown, path: string): unknown {
+  if (!source) return undefined;
+  const segments = path.split('.').filter(Boolean);
+  let current: unknown = source;
+  for (const segment of segments) {
+    if (current && typeof current === 'object' && segment in (current as Record<string, unknown>)) {
+      current = (current as Record<string, unknown>)[segment];
+    } else {
+      return undefined;
+    }
+  }
+  return current;
+}
+
+function extractSoapProducts(payload: unknown): { records: UnknownRecord[]; totalPages?: number } {
+  const candidatePaths = [
+    'GetProductsResult.Products.Product',
+    'GetProductDataResult.Products.Product',
+    'Products.Product',
+    'ProductData.Products.Product',
+    'Product',
   ];
 
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    const list = toArray<UnknownRecord>(candidate as UnknownRecord | UnknownRecord[] | null | undefined);
-    if (list.length > 0) {
-      return list;
+  for (const path of candidatePaths) {
+    const value = getNestedValue(payload, path);
+    const records = toArray(value as UnknownRecord | UnknownRecord[] | null | undefined);
+    if (records.length) {
+      const totalPages =
+        readNumber(getNestedValue(payload, 'GetProductsResult.TotalPages')) ??
+        readNumber(getNestedValue(payload, 'Products.TotalPages')) ??
+        readNumber(getNestedValue(payload, 'Paging.TotalPages'));
+      return { records, totalPages: totalPages ?? undefined };
     }
   }
 
-  return [];
-}
-
-function extractNextCursor(payload: PromoStandardsCatalogResponse, currentPage: number): CatalogPageCursor | null {
-  const pageInfo = payload.pagination ?? payload.PageInfo;
-  if (!pageInfo) {
-    return null;
-  }
-
-  const pageInfoRecord = (pageInfo ?? {}) as Record<string, unknown>;
-  const nextPageCandidate =
-    pageInfoRecord.nextPage ??
-    pageInfoRecord.NextPage ??
-    pageInfoRecord.pageNumber ??
-    pageInfoRecord.PageNumber;
-
-  const nextPage = readNumber(nextPageCandidate ?? currentPage + 1);
-  const totalPages = readNumber(
-    pageInfoRecord.totalPages ?? pageInfoRecord.TotalPages ?? pageInfoRecord.TotalPage
-  );
-
-  if (!nextPage || (totalPages && nextPage > totalPages)) {
-    return null;
-  }
-
-  if (nextPage === currentPage) {
-    return null;
-  }
-
-  return { pageNumber: nextPage };
+  return { records: [] };
 }
 
 async function fetchCatalogPage(
+  soapClient: GenericSoapClient,
   cursor: CatalogPageCursor | null,
   options: SanmarCatalogSyncOptions
 ): Promise<CatalogPageResult> {
-  const endpoint =
-    process.env.SANMAR_PROMOSTANDARDS_CATALOG_URL ??
-    process.env.SUPPLIER_CATALOG_URL ??
-    process.env.SANMAR_PROMOSTANDARDS_URL ??
-    DEFAULT_CATALOG_ENDPOINT;
-
-  const username = requireEnv('SANMAR_PROMOSTANDARDS_USERNAME');
-  const password = requireEnv('SANMAR_PROMOSTANDARDS_PASSWORD');
-  const account = requireEnv('SANMAR_ACCOUNT_NUMBER');
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  };
-
-  if (process.env.SANMAR_PROMOSTANDARDS_TOKEN) {
-    headers.Authorization = `Bearer ${process.env.SANMAR_PROMOSTANDARDS_TOKEN}`;
-  } else {
-    const basic = Buffer.from(`${username}:${password}`, 'utf8').toString('base64');
-    headers.Authorization = `Basic ${basic}`;
+  if (!soapClient) {
+    throw new Error('SanMar SOAP client not provided');
   }
+
+  const operation = options.soapOperation ?? getEnvOrDefault('SANMAR_PRODUCT_OPERATION', 'GetProducts');
+  const requestKey = getEnvOrDefault('SANMAR_PRODUCT_REQUEST_KEY', 'request');
+  const pageField = getEnvOrDefault('SANMAR_PRODUCT_PAGE_FIELD', 'Page');
+  const pageSizeField = getEnvOrDefault('SANMAR_PRODUCT_PAGE_SIZE_FIELD', 'PageSize');
+  const includeInactiveField = getEnvOrDefault('SANMAR_PRODUCT_INCLUDE_INACTIVE_FIELD', 'IncludeInactive');
+  const includeDiscontinuedField = getEnvOrDefault(
+    'SANMAR_PRODUCT_INCLUDE_DISCONTINUED_FIELD',
+    'IncludeDiscontinued'
+  );
+  const modifiedField = getEnvOrDefault('SANMAR_PRODUCT_MODIFIED_FIELD', 'ModifiedSince');
 
   const pageNumber = cursor?.pageNumber ?? 1;
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
 
-  const payload: Record<string, unknown> = {
-    Identity: {
-      Account: account,
-      Username: username,
-      Password: password,
-    },
-    Criteria: {
-      PageNumber: pageNumber,
-      PageSize: pageSize,
-      IncludeDiscontinued: true,
-      IncludeInactive: true,
-      LastModifiedDate: options.modifiedSince?.toISOString(),
-    },
+  const requestBody: Record<string, unknown> = {
+    [pageField]: pageNumber,
+    [pageSizeField]: pageSize,
+    [includeInactiveField]: true,
+    [includeDiscontinuedField]: true,
   };
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
-    cache: 'no-store',
-    next: { revalidate: 0 },
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`SanMar catalog request failed: ${response.status} ${text}`);
+  if (options.modifiedSince) {
+    requestBody[modifiedField] = options.modifiedSince.toISOString();
   }
 
-  const json = (await response.json()) as PromoStandardsCatalogResponse;
-  const rawProducts = extractProducts(json);
-  const normalized = rawProducts
+  const payload = wrapRequestBody(requestKey, requestBody);
+  const soapResponse = await invokeSoapOperation(soapClient, operation, payload);
+  const { records, totalPages } = extractSoapProducts(soapResponse);
+
+  const normalized = records
     .map((record) => normalizeProduct(record))
     .filter((record): record is NormalizedProduct => Boolean(record));
 
-  const nextCursor = extractNextCursor(json, pageNumber);
+  const hasMore = totalPages ? pageNumber < totalPages : normalized.length === pageSize;
+  const nextCursor = hasMore ? { pageNumber: pageNumber + 1 } : null;
 
   return {
     items: normalized,
     nextCursor,
-    rawCount: rawProducts.length,
+    rawCount: records.length,
   };
 }
 
@@ -565,6 +510,11 @@ export async function syncSanmarCatalog(
   client: PrismaClient = prisma,
   options: SanmarCatalogSyncOptions = {}
 ): Promise<SanmarCatalogSyncResult> {
+  const soapClient = options.soapClient;
+  if (!soapClient) {
+    throw new Error('SanMar SOAP client missing. Pass `soapClient` to syncSanmarCatalog.');
+  }
+
   let cursor: CatalogPageCursor | null = null;
   let page = 0;
   let fetched = 0;
@@ -578,7 +528,7 @@ export async function syncSanmarCatalog(
       break;
     }
 
-    const pageResult = await fetchCatalogPage(cursor, options);
+    const pageResult = await fetchCatalogPage(soapClient, cursor, options);
     page += 1;
     fetched += pageResult.rawCount;
 

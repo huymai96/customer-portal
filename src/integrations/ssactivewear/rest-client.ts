@@ -251,6 +251,30 @@ export async function fetchRestStyle(
 }
 
 /**
+ * Fetch all styles via paginated REST endpoint.
+ */
+export async function fetchAllRestStyles(pageSize = 250): Promise<RestStyle[]> {
+  const styles: RestStyle[] = [];
+  let page = 1;
+  while (true) {
+    const batch = await fetchRest<RestStyle[] | RestStyle | null>('/styles', {
+      page: String(page),
+      limit: String(pageSize),
+    });
+    const list = Array.isArray(batch) ? batch : batch ? [batch] : [];
+    if (!list.length) {
+      break;
+    }
+    styles.push(...list);
+    if (list.length < pageSize) {
+      break;
+    }
+    page += 1;
+  }
+  return styles;
+}
+
+/**
  * Fetch complete bundle: products + style metadata.
  */
 export async function fetchRestBundle(productId: string): Promise<RestBundle> {

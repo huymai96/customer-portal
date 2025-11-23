@@ -153,6 +153,12 @@ enum ArtworkAssetType {
   OTHER
 }
 
+enum CartStatus {
+  ACTIVE
+  SUBMITTED
+  ARCHIVED
+}
+
 enum SupplierSource {
   SANMAR
   SSACTIVEWEAR
@@ -228,4 +234,37 @@ model ArtworkAsset {
 
   @@index([orderId])
   @@index([orderDecorationId])
+}
+
+model Cart {
+  id        String     @id @default(uuid())
+  status    CartStatus @default(ACTIVE)
+  userId    String?
+  companyId String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  lines     CartLine[]
+
+  @@index([status])
+}
+
+model CartLine {
+  id                   String         @id @default(uuid())
+  cartId               String
+  canonicalStyleId     String
+  canonicalStyleNumber String
+  displayName          String?
+  brand                String?
+  supplier             SupplierSource
+  supplierPartId       String
+  colorCode            String
+  colorName            String?
+  sizeQuantities       Json
+  metadata             Json?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  cart                 Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  @@index([cartId])
+  @@unique([cartId, supplierPartId, colorCode])
 }

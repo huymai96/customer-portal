@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient, SupplierSource } from '@prisma/client';
 
+import { loadCanonicalMappings } from '@/lib/catalog/canonical-catalog';
 import { prisma } from '@/lib/prisma';
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
@@ -23,6 +24,44 @@ function normalizeCode(value: string): string {
 function normalizeDisplayName(value?: string): string | undefined {
   const trimmed = value?.trim();
   return trimmed && trimmed.length > 0 ? trimmed : undefined;
+}
+
+interface CanonicalLookupCache {
+  bySupplierStyle: Map<string, string>;
+  byAlias: Map<string, string>;
+}
+
+let canonicalLookupCache: CanonicalLookupCache | null = null;
+const fallbackWarningKeys = new Set<string>();
+
+function getCanonicalLookupCache(): CanonicalLookupCache {
+  if (canonicalLookupCache) {
+    return canonicalLookupCache;
+  }
+
+  const bySupplierStyle = new Map<string, string>();
+  const byAlias = new Map<string, string>();
+
+  for (const record of loadCanonicalMappings()) {
+    byAlias.set(record.canonicalSku, record.canonicalSku);
+    for (const alias of record.aliases ?? []) {
+      byAlias.set(alias.trim().toUpperCase(), record.canonicalSku);
+    }
+
+    for (const [supplier, mapping] of Object.entries(record.suppliers ?? {})) {
+      if (mapping?.style) {
+        const normalizedSupplier = supplier.trim().toUpperCase();
+        const normalizedStyle = mapping.style.trim().toUpperCase();
+        const key = `${normalizedSupplier}:${normalizedStyle}`;
+        if (!bySupplierStyle.has(key)) {
+          bySupplierStyle.set(key, record.canonicalSku);
+        }
+      }
+    }
+  }
+
+  canonicalLookupCache = { bySupplierStyle, byAlias };
+  return canonicalLookupCache;
 }
 
 export interface EnsureCanonicalStyleLinkParams {
@@ -95,6 +134,21 @@ interface GuessStyleInput {
 
 export function guessCanonicalStyleNumber(input: GuessStyleInput): string {
   const part = normalizeCode(input.supplierPartId);
+  const { bySupplierStyle, byAlias } = getCanonicalLookupCache();
+  const supplierKey = `${input.supplier}:${part}`;
+  const mapped = bySupplierStyle.get(supplierKey) ?? byAlias.get(part);
+  if (mapped) {
+    return mapped;
+  }
+
+  const warningKey = `${input.supplier}:${part}`;
+  if (!fallbackWarningKeys.has(warningKey)) {
+    fallbackWarningKeys.add(warningKey);
+    console.warn(
+      `[canonical] No mapping entry found for ${warningKey}; falling back to heuristic style numbers.`
+    );
+  }
+
   const brandPrefix = input.brand ? normalizeDisplayName(input.brand) : undefined;
 
   if (/^[A-Z]?\d{4,}$/u.test(part)) {

@@ -1,0 +1,10 @@
+node_modules/
+.next/
+build/
+dist/
+out/
+coverage/
+logs/
+tmp/
+**/*.d.ts
+

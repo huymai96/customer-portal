@@ -12,7 +12,17 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Re-add node_modules because overriding removes upstream defaults.
+    "node_modules/**",
   ]),
+  {
+    files: ["**/*.{ts,tsx}"],
+    languageOptions: {
+      parserOptions: {
+        project: null,
+      },
+    },
+  },
 ]);
 
 export default eslintConfig;

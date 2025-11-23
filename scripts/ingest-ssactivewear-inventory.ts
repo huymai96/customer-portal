@@ -29,29 +29,89 @@ function parseArgs(): CliOptions | null {
   };
 }
 
+interface InventorySizeEntry {
+  qty: number;
+  backorderDate?: string;
+  colorCode?: string;
+  warehouses?: Array<{ warehouseId: string; warehouseName?: string; quantity: number }>;
+}
+
+function normalizeColorCode(raw?: string): string {
+  const trimmed = raw?.trim();
+  if (!trimmed || trimmed.length === 0) {
+    return 'ALL';
+  }
+  return trimmed.toUpperCase();
+}
+
 async function ingestInventory(productId: string, colorCode?: string): Promise<void> {
   console.log(`[${productId}] Fetching inventory data...`);
   if (colorCode) {
     console.log(`[${productId}] Filtering by color: ${colorCode}`);
   }
-  
+
   const result = await fetchInventoryWithFallback(productId, colorCode);
-  
+
   console.log(`[${productId}] Source: ${result.source}`);
   if (result.warnings) {
     console.warn(`[${productId}] Warnings:`, result.warnings);
   }
 
-  const { inventory } = result;
-  const sizeCount = Object.keys(inventory.bySize).length;
-  console.log(`[${productId}] Found inventory for ${sizeCount} sizes`);
+  const product = await prisma.product.findUnique({
+    where: { supplierPartId: productId.toUpperCase() },
+    select: { id: true },
+  });
 
-  // For now, just log the inventory - in production you'd upsert to ProductInventory table
-  for (const [sizeCode, qty] of Object.entries(inventory.bySize)) {
-    console.log(`  ${sizeCode}: ${qty.qty} units${qty.backorderDate ? ` (backorder: ${qty.backorderDate})` : ''}`);
+  if (!product) {
+    console.warn(`[${productId}] No matching Product record found; skipping upsert.`);
+    return;
   }
 
-  console.log(`[${productId}] Inventory fetch complete`);
+  const { inventory } = result;
+  const sizeEntries = Object.entries(inventory.bySize as Record<string, InventorySizeEntry>);
+  const fetchedAt = new Date();
+
+  for (const [sizeCodeRaw, entry] of sizeEntries) {
+    const normalizedSize = sizeCodeRaw.trim().toUpperCase();
+    const rawColor = entry.colorCode ?? colorCode ?? 'ALL';
+    const normalizedColor = normalizeColorCode(rawColor);
+
+    const warehousesJson =
+      entry.warehouses && entry.warehouses.length > 0
+        ? entry.warehouses.map((warehouse) => ({
+            warehouseId: warehouse.warehouseId,
+            warehouseName: warehouse.warehouseName,
+            quantity: warehouse.quantity,
+          }))
+        : undefined;
+
+    await prisma.productInventory.upsert({
+      where: {
+        supplierPartId_colorCode_sizeCode: {
+          supplierPartId: productId.toUpperCase(),
+          colorCode: normalizedColor,
+          sizeCode: normalizedSize,
+        },
+      },
+      create: {
+        productId: product.id,
+        supplierPartId: productId.toUpperCase(),
+        colorCode: normalizedColor,
+        sizeCode: normalizedSize,
+        totalQty: entry.qty,
+        warehouses: warehousesJson,
+        fetchedAt,
+      },
+      update: {
+        productId: product.id,
+        totalQty: entry.qty,
+        warehouses: warehousesJson,
+        fetchedAt,
+      },
+    });
+  }
+
+  console.log(`[${productId}] Upserted inventory for ${sizeEntries.length} sizes.`);
 }
 
 async function main() {

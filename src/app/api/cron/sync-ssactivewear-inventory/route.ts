@@ -38,7 +38,7 @@ async function syncInventoryForProduct(supplierPartId: string): Promise<number> 
     return 0;
   }
 
-  const inventoryMap = new Map<string, number>();
+  const inventoryMap = new Map<string, { totalQty: number; warehouses: Array<{ warehouseId: string; warehouseName?: string; quantity: number }> }>();
   
   for (const product of products) {
     const colorCode = product.colorCode || 'DEFAULT';
@@ -46,19 +46,48 @@ async function syncInventoryForProduct(supplierPartId: string): Promise<number> 
     const key = `${colorCode}::${sizeCode}`;
     
     let totalQty = 0;
+    const warehouses: Array<{ warehouseId: string; warehouseName?: string; quantity: number }> = [];
+    
     if (product.warehouses && Array.isArray(product.warehouses)) {
       for (const warehouse of product.warehouses) {
-        totalQty += Number.parseInt(String(warehouse.qty || 0), 10) || 0;
+        const qty = Number.parseInt(String(warehouse.qty || 0), 10) || 0;
+        totalQty += qty;
+        if (qty > 0 || warehouse.warehouseAbbr) {
+          warehouses.push({
+            warehouseId: warehouse.warehouseAbbr || 'UNKNOWN',
+            warehouseName: warehouse.warehouseAbbr || undefined,
+            quantity: qty,
+          });
+        }
       }
     } else if (product.qty != null) {
       totalQty = Number.parseInt(String(product.qty), 10) || 0;
     }
     
-    inventoryMap.set(key, (inventoryMap.get(key) || 0) + totalQty);
+    const existing = inventoryMap.get(key);
+    if (existing) {
+      existing.totalQty += totalQty;
+      // Merge warehouses by warehouseId
+      const warehouseMap = new Map<string, { warehouseId: string; warehouseName?: string; quantity: number }>();
+      for (const wh of existing.warehouses) {
+        warehouseMap.set(wh.warehouseId, wh);
+      }
+      for (const wh of warehouses) {
+        const existingWh = warehouseMap.get(wh.warehouseId);
+        if (existingWh) {
+          existingWh.quantity += wh.quantity;
+        } else {
+          warehouseMap.set(wh.warehouseId, wh);
+        }
+      }
+      existing.warehouses = Array.from(warehouseMap.values());
+    } else {
+      inventoryMap.set(key, { totalQty, warehouses });
+    }
   }
 
   const now = new Date();
-  for (const [key, totalQty] of inventoryMap.entries()) {
+  for (const [key, data] of inventoryMap.entries()) {
     const [colorCode, sizeCode] = key.split('::');
     
     await prisma.productInventory.upsert({
@@ -73,11 +102,13 @@ async function syncInventoryForProduct(supplierPartId: string): Promise<number> 
         supplierPartId,
         colorCode,
         sizeCode,
-        totalQty,
+        totalQty: data.totalQty,
+        warehouses: data.warehouses.length > 0 ? data.warehouses : undefined,
         fetchedAt: now,
       },
       update: {
-        totalQty,
+        totalQty: data.totalQty,
+        warehouses: data.warehouses.length > 0 ? data.warehouses : undefined,
         fetchedAt: now,
       },
     });

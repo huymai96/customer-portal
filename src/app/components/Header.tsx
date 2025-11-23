@@ -1,12 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 
 import { NAV_LINKS } from './site-data';
 import { SearchBar } from './SearchBar';
+import { CartCount } from './CartCount';
 
-export function Header() {
+interface HeaderProps {
+  showSearch?: boolean;
+}
+
+export function Header({ showSearch = true }: HeaderProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
@@ -41,9 +46,13 @@ export function Header() {
             </button>
           </div>
         </div>
-        <div className="w-full md:flex-1">
-          <SearchBar />
-        </div>
+        {showSearch && (
+          <div className="w-full md:flex-1">
+            <Suspense fallback={<SearchBarFallback />}>
+              <SearchBar />
+            </Suspense>
+          </div>
+        )}
         <div className="flex items-center justify-end gap-3 md:ml-auto">
           <button
             className="hidden rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-700 md:inline-flex"
@@ -52,13 +61,7 @@ export function Header() {
           >
             <HeartIcon />
           </button>
-          <button
-            className="hidden rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-700 md:inline-flex"
-            type="button"
-            aria-label="Cart"
-          >
-            <CartIcon />
-          </button>
+          <CartCount />
           <button
             className="hidden rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-700 lg:hidden md:inline-flex"
             type="button"
@@ -116,24 +119,21 @@ function HeartIcon() {
   );
 }
 
-function CartIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="h-5 w-5">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.5}
-        d="M2.25 3h1.386c.51 0 .955.343 1.09.835l.383 1.436M7.5 14.25h10.128c.85 0 1.594-.596 1.79-1.43l1.482-6.182A1.125 1.125 0 0019.8 5.25H5.145M7.5 14.25L5.145 5.25M7.5 14.25l-.878 3.074A.75.75 0 007.356 18.75h9.288a.75.75 0 00.734-.576L18 14.25M9 21h.008v.008H9V21zm6 0h.008v.008H15V21z"
-      />
-    </svg>
-  );
-}
 
 function MenuIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="h-5 w-5">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
     </svg>
+  );
+}
+
+function SearchBarFallback() {
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">
+      <div className="h-10 flex-1 animate-pulse rounded bg-slate-100" />
+      <div className="h-8 w-8 animate-pulse rounded-full bg-slate-100" />
+    </div>
   );
 }
 

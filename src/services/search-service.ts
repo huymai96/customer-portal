@@ -2,13 +2,17 @@ import { Prisma, SupplierSource } from '@prisma/client';
 import { kv } from '@vercel/kv';
 
 import { prisma } from '@/lib/prisma';
-import type { ProductRecord } from '@/lib/types';
-import { loadSupplierProducts } from '@/services/supplier-product-loader';
 
 export interface SupplierSearchSummary {
   supplier: SupplierSource;
   supplierPartId: string;
   brand?: string | null;
+}
+
+export interface ColorPreview {
+  colorCode: string;
+  colorName: string | null;
+  swatchUrl?: string | null;
 }
 
 export interface CanonicalSearchResult {
@@ -19,6 +23,7 @@ export interface CanonicalSearchResult {
   primarySupplier?: SupplierSource;
   primarySupplierPartId: string;
   suppliers: SupplierSearchSummary[];
+  colors?: ColorPreview[];
   price?: {
     min?: number;
     max?: number;
@@ -39,6 +44,10 @@ const SUPPLIER_PRIORITY: SupplierSource[] = [
   SupplierSource.SANMAR,
   SupplierSource.SSACTIVEWEAR,
 ];
+
+type CanonicalStyleWithLinks = Prisma.CanonicalStyleGetPayload<{
+  include: { supplierLinks: true };
+}>;
 
 function normalizeQuery(query: string): string {
   return query.trim().toUpperCase();
@@ -79,8 +88,19 @@ export async function searchCanonicalStyles(
     }
   }
 
+  // Enhanced search: match styleNumber, displayName, brand, supplierPartId, and exact matches
   const whereClause: Prisma.CanonicalStyleWhereInput = {
     OR: [
+      // Exact matches (highest priority)
+      { styleNumber: { equals: normalized, mode: 'insensitive' } },
+      {
+        supplierLinks: {
+          some: {
+            supplierPartId: { equals: normalized, mode: 'insensitive' },
+          },
+        },
+      },
+      // Contains matches
       { styleNumber: { contains: normalized, mode: 'insensitive' } },
       { displayName: { contains: normalized, mode: 'insensitive' } },
       { brand: { contains: normalized, mode: 'insensitive' } },
@@ -118,83 +138,7 @@ export async function searchCanonicalStyles(
 
   const items = (
     await Promise.all(
-      canonicalStyles.map(async (style) => {
-        const suppliersEntries = style.supplierLinks.map((link) => ({
-          supplier: link.supplier,
-          supplierPartId: link.supplierPartId,
-          brand: style.brand,
-        }));
-        const primarySupplier =
-          SUPPLIER_PRIORITY.find((supplier) =>
-            suppliersEntries.some((entry) => entry.supplier === supplier)
-          ) ?? suppliersEntries[0]?.supplier;
-        const primaryEntry =
-          suppliersEntries.find((entry) => entry.supplier === primarySupplier) ?? suppliersEntries[0];
-
-        const bundle = await loadSupplierProducts(style.styleNumber).catch((error) => {
-          console.warn(
-            `[SearchService] Failed to load supplier bundle for ${style.styleNumber}:`,
-            error
-          );
-          return null;
-        });
-
-        const supplierMetrics = suppliersEntries.map((entry) => {
-          const product = bundle?.products?.[entry.supplier];
-          const price = extractProductPrice(product);
-          const totalQty = computeInventoryTotal(product);
-          const inStock = totalQty > 0;
-          return {
-            supplier: entry.supplier,
-            price,
-            inStock,
-          };
-        });
-
-        const availableSuppliers = supplierMetrics.filter((metric) => metric.inStock).length;
-        const priceValues = supplierMetrics
-          .map((metric) => metric.price)
-          .filter((price): price is number => price != null);
-
-        const result: CanonicalSearchResult = {
-          canonicalStyleId: style.id,
-          styleNumber: style.styleNumber,
-          displayName: style.displayName,
-          brand: style.brand ?? undefined,
-          primarySupplier,
-          primarySupplierPartId:
-            bundle?.primaryProduct?.supplierPartId ??
-            primaryEntry?.supplierPartId ??
-            style.styleNumber,
-          suppliers: suppliersEntries,
-          price: priceValues.length
-            ? {
-                min: Math.min(...priceValues),
-                max: Math.max(...priceValues),
-                currency: 'USD',
-              }
-            : undefined,
-          availability: {
-            suppliersInStock: availableSuppliers,
-            totalSuppliers: suppliersEntries.length,
-          },
-          primarySupplierInStock: supplierMetrics.some(
-            (metric) => metric.supplier === primarySupplier && metric.inStock
-          ),
-          score: computeScore(
-            normalized,
-            style.styleNumber,
-            style.displayName ?? '',
-            suppliersEntries
-          ),
-        };
-
-        if (inStockOnly && result.availability?.suppliersInStock === 0) {
-          return null;
-        }
-
-        return result;
-      })
+      canonicalStyles.map(async (style) => formatCanonicalStyle(style, normalized, inStockOnly))
     )
   ).filter((item): item is CanonicalSearchResult => item !== null);
 
@@ -260,45 +204,128 @@ function computeScore(
   return score;
 }
 
-function extractProductPrice(product?: ProductRecord | null): number | null {
-  if (!product?.attributes || typeof product.attributes !== 'object') {
+async function formatCanonicalStyle(
+  style: CanonicalStyleWithLinks,
+  normalizedQuery: string,
+  inStockOnly = false
+): Promise<CanonicalSearchResult | null> {
+  const suppliersEntries = style.supplierLinks.map((link) => ({
+    supplier: link.supplier,
+    supplierPartId: link.supplierPartId,
+    brand: style.brand,
+  }));
+  if (suppliersEntries.length === 0) {
     return null;
   }
-  const attributes = product.attributes as Record<string, unknown>;
-  const candidates = [
-    attributes.customerPrice,
-    attributes.salePrice,
-    attributes.piecePrice,
-    attributes.maxPiecePrice,
+
+  const primarySupplier =
+    SUPPLIER_PRIORITY.find((supplier) =>
+      suppliersEntries.some((entry) => entry.supplier === supplier)
+    ) ?? suppliersEntries[0]?.supplier;
+  const primaryEntry =
+    suppliersEntries.find((entry) => entry.supplier === primarySupplier) ?? suppliersEntries[0];
+
+  // Fetch color preview (limit to first 12 colors for performance)
+  let colors: ColorPreview[] = [];
+  if (primaryEntry) {
+    const productColors = await prisma.productColor.findMany({
+      where: {
+        product: {
+          supplierPartId: primaryEntry.supplierPartId,
+        },
+      },
+      select: {
+        colorCode: true,
+        colorName: true,
+        swatchUrl: true,
+      },
+      take: 12,
+      orderBy: {
+        colorCode: 'asc',
+      },
+    });
+    colors = productColors.map((c) => ({
+      colorCode: c.colorCode,
+      colorName: c.colorName,
+      swatchUrl: c.swatchUrl,
+    }));
+  }
+
+  const result: CanonicalSearchResult = {
+    canonicalStyleId: style.id,
+    styleNumber: style.styleNumber,
+    displayName: style.displayName,
+    brand: style.brand ?? undefined,
+    primarySupplier,
+    primarySupplierPartId: primaryEntry?.supplierPartId ?? style.styleNumber,
+    suppliers: suppliersEntries,
+    colors: colors.length > 0 ? colors : undefined,
+    price: undefined,
+    availability: undefined,
+    primarySupplierInStock: undefined,
+    score: computeScore(
+      normalizedQuery,
+      style.styleNumber,
+      style.displayName ?? '',
+      suppliersEntries
+    ),
+  };
+
+  if (inStockOnly && result.availability?.suppliersInStock === 0) {
+    return null;
+  }
+
+  return result;
+}
+
+export async function findExactCanonicalStyleMatch(
+  query: string,
+  suppliers: SupplierSource[] = []
+): Promise<CanonicalSearchResult | null> {
+  const normalized = normalizeQuery(query);
+  if (!normalized) {
+    return null;
+  }
+
+  const andConditions: Prisma.CanonicalStyleWhereInput[] = [
+    {
+      OR: [
+        { styleNumber: { equals: normalized, mode: 'insensitive' } },
+        {
+          supplierLinks: {
+            some: {
+              supplierPartId: { equals: normalized, mode: 'insensitive' },
+            },
+          },
+        },
+      ],
+    },
   ];
-  for (const candidate of candidates) {
-    const parsed = toNumber(candidate);
-    if (parsed != null) {
-      return parsed;
-    }
-  }
-  return null;
-}
 
-function computeInventoryTotal(product?: ProductRecord | null): number {
-  if (!product?.inventory || product.inventory.length === 0) {
-    return 0;
+  if (suppliers.length > 0) {
+    andConditions.push({
+      supplierLinks: {
+        some: {
+          supplier: { in: suppliers },
+        },
+      },
+    });
   }
-  return product.inventory.reduce((sum, entry) => sum + (entry.totalQty ?? 0), 0);
-}
 
-function toNumber(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
+  const where: Prisma.CanonicalStyleWhereInput = {
+    AND: andConditions,
+  };
+
+  const matches = await prisma.canonicalStyle.findMany({
+    where,
+    include: { supplierLinks: true },
+    take: 2,
+  });
+
+  if (matches.length !== 1) {
+    return null;
   }
-  if (typeof value === 'string') {
-    const normalized = value.replace(/[^0-9.]/gu, '');
-    if (!normalized) {
-      return null;
-    }
-    const parsed = Number.parseFloat(normalized);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
+
+  return formatCanonicalStyle(matches[0], normalized) ?? null;
 }
 

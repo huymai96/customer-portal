@@ -2,10 +2,8 @@
 
 import clsx from 'clsx';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-
-import { findExactProductMatch, searchCatalogProducts } from '@/lib/search';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { startTransition, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
 import { POPULAR_CATEGORIES, RECENT_SEARCHES } from './site-data';
 
@@ -13,12 +11,28 @@ interface SearchBarProps {
   className?: string;
 }
 
+type SearchScope = 'ALL' | 'SANMAR' | 'SSACTIVEWEAR';
+
 export function SearchBar({ className }: SearchBarProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
-  const suggestions = useMemo(() => searchCatalogProducts(query.trim(), 5), [query]);
+  const [scope, setScope] = useState<SearchScope>('ALL');
+  const suggestions = useMemo(() => RECENT_SEARCHES.slice(0, 5), []);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Sync scope from URL on mount and when searchParams change
+  useEffect(() => {
+    const urlScope = searchParams.get('scope');
+    startTransition(() => {
+      if (urlScope === 'SANMAR' || urlScope === 'SSACTIVEWEAR') {
+        setScope(urlScope);
+      } else {
+        setScope('ALL');
+      }
+    });
+  }, [searchParams]);
 
   useEffect(() => {
     function handleClick(event: MouseEvent) {
@@ -38,17 +52,11 @@ export function SearchBar({ className }: SearchBarProps) {
       return;
     }
 
-    const exactMatch = findExactProductMatch(trimmed);
-    if (exactMatch) {
-      router.push(`/product/${encodeURIComponent(exactMatch.styleCode)}`);
-    } else {
-      router.push(`/search?query=${encodeURIComponent(trimmed)}`);
+    const params = new URLSearchParams({ query: trimmed });
+    if (scope !== 'ALL') {
+      params.set('scope', scope);
     }
-    setIsOpen(false);
-  };
-
-  const handleSuggestionSelect = (styleCode: string) => {
-    router.push(`/product/${encodeURIComponent(styleCode)}`);
+    router.push(`/search?${params.toString()}`);
     setIsOpen(false);
   };
 
@@ -57,10 +65,14 @@ export function SearchBar({ className }: SearchBarProps) {
       <form
         className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-200"
         onSubmit={handleSubmit}
+        action="/search"
+        method="get"
       >
+        <input type="hidden" name="scope" value={scope} />
         <input
           className="h-10 flex-1 border-none bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
           placeholder="Search products, styles or brands…"
+          name="query"
           value={query}
           onFocus={() => setIsOpen(true)}
           onChange={(event) => {
@@ -76,31 +88,47 @@ export function SearchBar({ className }: SearchBarProps) {
           <SearchIcon />
         </button>
       </form>
+      <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+        {(['ALL', 'SANMAR', 'SSACTIVEWEAR'] as SearchScope[]).map((value) => (
+          <button
+            type="button"
+            key={value}
+            onClick={() => setScope(value)}
+            className={clsx(
+              'rounded-full border px-3 py-1 transition',
+              scope === value
+                ? 'border-brand-500 bg-brand-50 text-brand-700'
+                : 'border-slate-200 text-slate-500 hover:border-brand-300 hover:text-brand-600'
+            )}
+          >
+            {value === 'ALL' ? 'Search All' : value === 'SANMAR' ? 'SanMar' : 'S&S Activewear'}
+          </button>
+        ))}
+      </div>
 
       {isOpen ? (
         <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
           <div className="grid gap-6 p-5 md:grid-cols-[2fr,1fr]">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-                Matching products
+                Quick picks
               </p>
               <ul className="mt-2 divide-y divide-slate-100 text-sm text-slate-700">
                 {suggestions.length ? (
-                  suggestions.map((hit) => (
-                    <li key={hit.product.styleCode} className="py-2">
+                  suggestions.map((item) => (
+                    <li key={item} className="py-2">
                       <button
                         type="button"
                         className="w-full text-left"
                         onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => handleSuggestionSelect(hit.product.styleCode)}
+                        onClick={() => {
+                          setQuery(item);
+                          setIsOpen(false);
+                          router.push(`/search?query=${encodeURIComponent(item)}`);
+                        }}
                       >
-                        <span className="font-semibold text-slate-900">
-                          {hit.product.brand} • {hit.product.name}
-                        </span>
-                        <span className="ml-2 text-xs uppercase tracking-[0.3em] text-slate-400">
-                          {hit.product.styleCode}
-                        </span>
-                        <p className="text-xs text-slate-400">{hit.reason}</p>
+                        <span className="font-semibold text-slate-900">{item}</span>
+                        <p className="text-xs text-slate-400">Search catalog</p>
                       </button>
                     </li>
                   ))

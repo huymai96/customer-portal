@@ -23,7 +23,7 @@ export function getSanmarSftpConfig(): SanmarSftpConfig {
   const port = Number.parseInt(process.env.SANMAR_FTP_PORT ?? '2200', 10);
   const username = requireEnv('SANMAR_FTP_USERNAME');
   const password = requireEnv('SANMAR_FTP_PASSWORD');
-  const remoteDir = process.env.SANMAR_FTP_REMOTE_DIR ?? 'SanmarPDD';
+  const remoteDir = process.env.SANMAR_FTP_REMOTE_DIR ?? 'SanMarPDD';
 
   return { host, port, username, password, remoteDir };
 }
@@ -52,16 +52,50 @@ export async function downloadSanmarFiles(options: DownloadOptions, config = get
     const fastGetOptions = { concurrency: 4 };
 
     for (const file of options.files) {
-      const remotePath = remoteBase ? `${remoteBase}/${file}` : file;
+      // Try multiple path variations
+      const pathVariations = [
+        remoteBase ? `${remoteBase}/${file}` : file,
+        remoteBase ? `/${remoteBase}/${file}` : `/${file}`,
+        file, // Just the filename
+        `/${file}`, // Root with filename
+      ];
+
       const localPath = path.join(options.targetDir, path.basename(file));
+      let downloadedSuccessfully = false;
 
       if (!options.overwrite && downloaded.includes(localPath)) {
         continue;
       }
 
-      await client.fastGet(remotePath, localPath, fastGetOptions).catch((error) => {
-        throw new Error(`Failed to download ${remotePath}: ${error instanceof Error ? error.message : String(error)}`);
-      });
+      for (const remotePath of pathVariations) {
+        try {
+          await client.fastGet(remotePath, localPath, fastGetOptions);
+          downloaded.push(localPath);
+          downloadedSuccessfully = true;
+          console.log(`   ✅ Downloaded: ${remotePath} -> ${localPath}`);
+          break; // Success, move to next file
+        } catch (error) {
+          // Try next path variation
+          continue;
+        }
+      }
+
+      if (!downloadedSuccessfully) {
+        // List directory to help debug
+        try {
+          const dirContents = await client.list(remoteBase || '/');
+          const fileNames = dirContents.map((f) => f.name).join(', ');
+          throw new Error(
+            `Failed to download ${file}. Tried paths: ${pathVariations.join(', ')}. ` +
+            `Files in ${remoteBase || 'root'}: ${fileNames || 'none'}`
+          );
+        } catch (listError) {
+          throw new Error(
+            `Failed to download ${file}. Tried paths: ${pathVariations.join(', ')}. ` +
+            `Also failed to list directory: ${listError instanceof Error ? listError.message : String(listError)}`
+          );
+        }
+      }
 
       downloaded.push(localPath);
     }

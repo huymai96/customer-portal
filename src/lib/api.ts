@@ -40,7 +40,9 @@ export async function fetchProduct(supplierPartId: string) {
   }
 
   // Fetch from API
-  const product = await request<ProductRecord>(`/api/products/${encodeURIComponent(supplierPartId)}`);
+  const product = await request<ProductRecord>(
+    `/api/supplier-products/${encodeURIComponent(supplierPartId)}`
+  );
   
   // Cache for 10 minutes
   searchCache.set(cacheKey, product, 10 * 60 * 1000);
@@ -60,7 +62,7 @@ export async function fetchInventorySnapshot(supplierPartId: string, colorCode: 
   // Fetch from API
   const params = new URLSearchParams({ color: colorCode });
   const inventory = await request<InventorySnapshot>(
-    `/api/products/${encodeURIComponent(supplierPartId)}/inventory?${params.toString()}`
+    `/api/supplier-products/${encodeURIComponent(supplierPartId)}/inventory?${params.toString()}`
   );
   
   // Cache for 2 minutes (inventory changes frequently)

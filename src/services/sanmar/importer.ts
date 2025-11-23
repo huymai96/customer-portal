@@ -1,9 +1,10 @@
 import { createReadStream } from 'fs';
 import path from 'path';
 import { parse } from 'csv-parse';
-import { Prisma } from '@prisma/client';
+import { Prisma, SupplierSource } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
+import { ensureCanonicalStyleLink, guessCanonicalStyleNumber } from '@/services/canonical-style';
 
 interface ProductAccumulator {
   supplierPartId: string;
@@ -48,12 +49,15 @@ export interface ImportOptions {
   sdlPath: string;
   dryRun?: boolean;
   limit?: number;
+  styleFilter?: string[];
 }
 
 export interface ImportResult {
   processed: number;
   created: number;
   updated: number;
+  matchedStyles: string[];
+  missingStyles: string[];
 }
 
 const NUMBER_REGEX = /-?[0-9]+(?:\.[0-9]+)?/u;
@@ -101,9 +105,14 @@ function addKeyword(target: Set<string>, value: string | null | undefined) {
 }
 
 export async function importSanmarCatalog(options: ImportOptions): Promise<ImportResult> {
-  const { sdlPath, dryRun = false, limit } = options;
+  const { sdlPath, dryRun = false, limit, styleFilter } = options;
   const resolvedPath = path.resolve(sdlPath);
   const accumulators = new Map<string, ProductAccumulator>();
+  const filterSet =
+    styleFilter && styleFilter.length > 0
+      ? new Set(styleFilter.map((style) => style.trim().toUpperCase()))
+      : undefined;
+  const matchedFilterStyles = new Set<string>();
 
   let processedRows = 0;
 
@@ -121,7 +130,7 @@ export async function importSanmarCatalog(options: ImportOptions): Promise<Impor
           return;
         }
         processedRows += 1;
-        processRecord(accumulators, record);
+        processRecord(accumulators, record, filterSet, matchedFilterStyles);
       })
       .on('error', reject)
       .on('end', () => resolve());
@@ -235,18 +244,52 @@ export async function importSanmarCatalog(options: ImportOptions): Promise<Impor
     } else {
       updated += 1;
     }
+
+    await ensureCanonicalStyleLink(prisma, {
+      supplier: SupplierSource.SANMAR,
+      supplierPartId: accumulator.supplierPartId,
+      styleNumber: guessCanonicalStyleNumber({
+        supplier: SupplierSource.SANMAR,
+        supplierPartId: accumulator.supplierPartId,
+        brand: accumulator.brand ?? undefined,
+      }),
+      displayName: accumulator.name,
+      brand: accumulator.brand ?? undefined,
+    });
   }
 
-  return { processed, created, updated };
+  const missingStyles =
+    filterSet && filterSet.size > 0
+      ? Array.from(filterSet.values()).filter((style) => !matchedFilterStyles.has(style))
+      : [];
+
+  return {
+    processed,
+    created,
+    updated,
+    matchedStyles: Array.from(matchedFilterStyles.values()),
+    missingStyles,
+  };
 }
 
-function processRecord(accumulators: Map<string, ProductAccumulator>, record: Record<string, string>) {
+function processRecord(
+  accumulators: Map<string, ProductAccumulator>,
+  record: Record<string, string>,
+  styleFilter?: Set<string>,
+  matchedStyles?: Set<string>
+) {
   const style = record['STYLE#']?.trim();
   if (!style) {
     return;
   }
 
   const supplierPartId = style.toUpperCase();
+  if (styleFilter && !styleFilter.has(supplierPartId)) {
+    return;
+  }
+  if (matchedStyles) {
+    matchedStyles.add(supplierPartId);
+  }
   const colorNameRaw = record.COLOR_NAME?.trim();
   const sizeRaw = record.SIZE?.trim();
 

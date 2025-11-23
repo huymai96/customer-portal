@@ -1,0 +1,62 @@
+[
+  {
+    "canonicalSku": "PC43",
+    "name": "Core Cotton Pocket Tee",
+    "brand": "Port & Company",
+    "aliases": ["PC43", "PC430"],
+    "suppliers": {
+      "SANMAR": {
+        "style": "PC43"
+      }
+    }
+  },
+  {
+    "canonicalSku": "5000",
+    "name": "Heavy Cotton Tee",
+    "brand": "Gildan",
+    "aliases": ["5000", "G500", "G5000"],
+    "suppliers": {
+      "SANMAR": {
+        "style": "G500"
+      },
+      "SSACTIVEWEAR": {
+        "style": "5000"
+      }
+    }
+  },
+  {
+    "canonicalSku": "64000",
+    "name": "Softstyle Tee",
+    "brand": "Gildan",
+    "aliases": ["64000", "6400", "G640"],
+    "suppliers": {
+      "SSACTIVEWEAR": {
+        "style": "64000"
+      }
+    }
+  },
+  {
+    "canonicalSku": "BC3001",
+    "name": "Unisex Jersey Short Sleeve Tee",
+    "brand": "Bella+Canvas",
+    "aliases": ["BC3001", "3001"],
+    "suppliers": {
+      "SSACTIVEWEAR": {
+        "style": "BC3001"
+      }
+    }
+  },
+  {
+    "canonicalSku": "A230",
+    "name": "Men's Performance Polo",
+    "brand": "Adidas",
+    "aliases": ["A230"],
+    "suppliers": {
+      "SSACTIVEWEAR": {
+        "style": "A230"
+      }
+    }
+  }
+]
+
+

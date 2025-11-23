@@ -1,7 +1,14 @@
-import { mkdir } from 'fs/promises';
-import path from 'path';
+import { mkdir } from "fs/promises";
+import path from "path";
+import { config } from "dotenv";
 
-import { downloadSanmarFiles, getSanmarSftpConfig } from '../src/services/sanmar/sftp';
+const envFiles = ['.env.local', '.env'];
+for (const envFile of envFiles) {
+  const envPath = path.resolve(process.cwd(), envFile);
+  config({ path: envPath, override: false });
+}
+
+import { downloadSanmarFiles, getSanmarSftpConfig } from "../src/services/sanmar/sftp";
 
 const DEFAULT_FILES = (process.env.SANMAR_FTP_FILES ?? 'SanMar_SDL_N.csv,SanMar_EPDD.csv,sanmar_dip.txt')
   .split(',')

@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { CategoryGrid } from './components/CategoryGrid';
 import { Header } from './components/Header';
 import { CATEGORY_TILES } from './components/site-data';
@@ -5,7 +7,7 @@ import { CATEGORY_TILES } from './components/site-data';
 export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50">
-      <Header />
+      <Header showSearch={false} />
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-12 px-4 pb-16 pt-10">
         <section className="grid gap-8 rounded-3xl bg-white p-8 shadow-lg lg:grid-cols-[3fr,2fr]">
           <div className="space-y-6">
@@ -17,8 +19,22 @@ export default function Home() {
             </h1>
             <p className="text-sm text-slate-600">
               Promos Ink unifies SanMar and S&amp;S Activewear data so your merchandising, creative, and
-              production teams stay in sync. Use the global search above or browse curated assortments below.
+              production teams stay in sync. Browse by supplier or use the global search above.
             </p>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/search?scope=SANMAR"
+                className="rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+              >
+                Browse SanMar Products
+              </Link>
+              <Link
+                href="/search?scope=SSACTIVEWEAR"
+                className="rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+              >
+                Browse S&amp;S Activewear Products
+              </Link>
+            </div>
             <div className="flex flex-wrap gap-3 text-sm font-semibold text-slate-600">
               <span className="rounded-full bg-slate-100 px-4 py-2">Live inventory snapshots</span>
               <span className="rounded-full bg-slate-100 px-4 py-2">Pricing &amp; decoration ready</span>
