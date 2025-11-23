@@ -91,7 +91,7 @@ export interface OrderResponse {
     status: string;
     externalOrderId: string;
     createdAt: string;
-    items: any[];
+    items: OrderItem[];
     total: number;
     trackingNumber?: string;
   };
@@ -106,7 +106,7 @@ export interface OrderStatusResponse {
     externalOrderId: string;
     createdAt: string;
     updatedAt: string;
-    items: any[];
+    items: OrderItem[];
     total: number;
     trackingNumber?: string;
     trackingUrl?: string;

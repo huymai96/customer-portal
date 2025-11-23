@@ -12,25 +12,59 @@ import {
 } from '@/lib/orders/service';
 import { getApiErrorMessage } from '@/lib/api/client';
 
+interface CartData {
+  externalOrderId?: string;
+  customerInfo?: { name?: string; email?: string; phone?: string; company?: string };
+  shippingAddress: {
+    name: string;
+    company?: string;
+    street1: string;
+    street2?: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    country: string;
+    phone: string;
+  };
+  items: Array<{
+    styleNumber: string;
+    productName: string;
+    supplierPartId: string;
+    canonicalStyleId: string;
+    color: string;
+    colorName: string;
+    size: string;
+    quantity: number;
+    unitPrice: number;
+    decorations?: Array<{
+      method: string;
+      location: string;
+      description: string;
+      artworkUrl?: string;
+      colors?: number;
+      stitches?: number;
+      width?: number;
+      height?: number;
+      setupFee: number;
+      unitCost: number;
+    }>;
+  }>;
+  shipping?: { method: string; cost: number; carrier?: string };
+  pricing?: { subtotal?: number; decorationTotal?: number; setupFees?: number; shipping?: number; tax?: number; total?: number };
+  shippingMethod?: string;
+  shippingCost?: number;
+  notes?: string;
+  inHandsDate?: string;
+  poNumber?: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // For now, skip Auth0 session check until we add proper middleware
     // TODO: Add proper authentication middleware
     
     // Parse request body (cart data from customer)
-    const cartData = await request.json() as {
-      externalOrderId?: string;
-      customerInfo?: { name?: string; email?: string; phone?: string; company?: string };
-      shippingAddress: any;
-      items: any[];
-      shipping?: { method?: string; cost?: number };
-      pricing?: { subtotal?: number; decorationTotal?: number; setupFees?: number; shipping?: number; tax?: number; total?: number };
-      shippingMethod?: string;
-      shippingCost?: number;
-      notes?: string;
-      inHandsDate?: string;
-      poNumber?: string;
-    };
+    const cartData = await request.json() as CartData;
 
     // Build order request for API-Docs
     const orderRequest: OrderRequest = {
@@ -43,7 +77,7 @@ export async function POST(request: NextRequest) {
         company: cartData.customerInfo?.company,
       },
       shippingAddress: cartData.shippingAddress,
-      items: cartData.items.map((item: any) => ({
+      items: cartData.items.map((item) => ({
         styleNumber: item.styleNumber,
         productName: item.productName,
         supplierPartId: item.supplierPartId,
@@ -55,9 +89,10 @@ export async function POST(request: NextRequest) {
         unitPrice: item.unitPrice,
         decorations: item.decorations || [],
       })),
-      shipping: cartData.shipping || {
-        method: cartData.shippingMethod || 'ground',
-        cost: cartData.shippingCost || 0,
+      shipping: {
+        method: cartData.shipping?.method || cartData.shippingMethod || 'ground',
+        cost: cartData.shipping?.cost ?? cartData.shippingCost ?? 0,
+        carrier: cartData.shipping?.carrier,
       },
       pricing: {
         subtotal: cartData.pricing?.subtotal || 0,
@@ -103,4 +138,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

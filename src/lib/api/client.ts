@@ -14,7 +14,7 @@ const PARTNER_CODE = process.env.PORTAL_PARTNER_CODE || 'PORTAL';
 interface ApiRequestOptions {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   path: string;
-  body?: any;
+  body?: Record<string, unknown>;
   headers?: Record<string, string>;
   timeout?: number;
 }
@@ -89,7 +89,7 @@ export async function apiRequest<T>(
     clearTimeout(timeoutId);
     
     // Parse response
-    let responseData: any;
+    let responseData: unknown;
     try {
       responseData = await response.json();
     } catch {

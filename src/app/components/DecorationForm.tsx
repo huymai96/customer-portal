@@ -78,7 +78,11 @@ export default function DecorationForm({
     }
 
     const result = calculateDecorationPricing(pricingInput);
-    setPricing({ unitCost: result.unitCost, setupFee: result.setupFee });
+    // Use setTimeout to avoid setState in render
+    const timer = setTimeout(() => {
+      setPricing({ unitCost: result.unitCost, setupFee: result.setupFee });
+    }, 0);
+    return () => clearTimeout(timer);
   }, [method, quantity, location, colors, stitches, printSizeCategory, garmentColor]);
 
   const handleSave = () => {
@@ -193,7 +197,7 @@ export default function DecorationForm({
           </label>
           <select
             value={printSizeCategory}
-            onChange={(e) => setPrintSizeCategory(e.target.value as any)}
+            onChange={(e) => setPrintSizeCategory(e.target.value as 'xsmall' | 'small' | 'medium' | 'large' | 'xlarge')}
             className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="xsmall">Extra Small (1-25 sq in)</option>

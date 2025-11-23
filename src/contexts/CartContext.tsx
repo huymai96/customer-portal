@@ -11,9 +11,6 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import {
-  type DecorationPricingInput,
-} from '@/lib/decoration/pricing';
 import { type OrderDecoration } from '@/lib/orders/service';
 
 // ============================================
@@ -97,7 +94,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        setItems(parsed);
+        // Use setTimeout to avoid setState during render
+        const timer = setTimeout(() => {
+          setItems(parsed);
+        }, 0);
+        return () => clearTimeout(timer);
       } catch (error) {
         console.error('Failed to load cart from localStorage:', error);
       }
@@ -135,15 +136,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const tax = (subtotal + decorationTotal + setupFees + shipping) * TAX_RATE;
     const total = subtotal + decorationTotal + setupFees + shipping + tax;
 
-    setSummary({
-      itemCount,
-      subtotal,
-      decorationTotal,
-      setupFees,
-      shipping,
-      tax,
-      total,
-    });
+    // Use setTimeout to avoid setState during render
+    const timer = setTimeout(() => {
+      setSummary({
+        itemCount,
+        subtotal,
+        decorationTotal,
+        setupFees,
+        shipping,
+        tax,
+        total,
+      });
+    }, 0);
+    return () => clearTimeout(timer);
   }, [items]);
 
   const addItem = useCallback((item: Omit<CartItem, 'id'>) => {

@@ -101,7 +101,7 @@ export default function OrderConfirmationPage() {
             <div className="ml-4">
               <h2 className="text-2xl font-bold text-green-900">Order Placed Successfully!</h2>
               <p className="mt-1 text-green-700">
-                Thank you for your order. We'll send you updates as your order progresses.
+                Thank you for your order. We&apos;ll send you updates as your order progresses.
               </p>
             </div>
           </div>
