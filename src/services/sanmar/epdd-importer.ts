@@ -90,7 +90,7 @@ export async function importSanmarEpdd(options: ImportEpddOptions): Promise<Impo
 
     // Merge EPDD data into product attributes
     const existingAttributes = (product.attributes as Prisma.JsonObject) ?? {};
-    const updatedAttributes: Prisma.JsonObject = {
+    const updatedAttributes: Record<string, Prisma.JsonValue> = {
       ...existingAttributes,
       // Add EPDD-specific fields
       ...(epddRecord.mainCategory && { mainCategory: epddRecord.mainCategory }),
@@ -102,7 +102,7 @@ export async function importSanmarEpdd(options: ImportEpddOptions): Promise<Impo
       ...(epddRecord.attributes ?? {}),
       // Merge pricing if provided
       ...(epddRecord.pricing && Object.keys(epddRecord.pricing).length > 0 && {
-        pricing: epddRecord.pricing,
+        pricing: epddRecord.pricing as Prisma.JsonValue,
       }),
     };
 
