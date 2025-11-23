@@ -180,19 +180,27 @@ export function ColorSwatches({ colors = [], selectedColorCode, onSelectColor }:
     return null;
   }
 
+  const selectedColor = colors.find(c => c.colorCode === selectedColorCode);
+  const selectedDisplayName = selectedColor?.colorName || selectedColorCode;
+
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-slate-700">
-          Colors {selectedColorCode ? (
-            <span className="text-slate-500">
-              / {colors.find(c => c.colorCode === selectedColorCode)?.colorName || selectedColorCode}
-            </span>
-          ) : null}
+      <div className="flex flex-wrap items-baseline gap-2">
+        <p className="text-sm font-semibold text-slate-900">
+          Colors: 
         </p>
-        <p className="text-xs text-slate-500">{sortedColors.length} options</p>
+        {selectedColorCode ? (
+          <p className="text-base font-medium text-brand-600">
+            {selectedDisplayName}
+          </p>
+        ) : (
+          <p className="text-sm text-slate-500">
+            Select a color ({sortedColors.length} available)
+          </p>
+        )}
       </div>
-      <div className="grid grid-cols-4 gap-3 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
+      
+      <div className="flex flex-wrap gap-2">
         {sortedColors.map((color) => {
           const isSelected = selectedColorCode === color.colorCode;
           const displayName = color.colorName ?? color.colorCode;
@@ -203,50 +211,33 @@ export function ColorSwatches({ colors = [], selectedColorCode, onSelectColor }:
               type="button"
               onClick={() => onSelectColor(color.colorCode)}
               className={clsx(
-                'group relative flex flex-col items-center gap-2 rounded-lg p-2 transition-all',
+                'group relative h-10 w-10 rounded-full border-2 shadow-sm transition-all hover:scale-110',
                 isSelected 
-                  ? 'bg-brand-50 ring-2 ring-brand-500' 
-                  : 'hover:bg-slate-50'
+                  ? 'border-brand-500 ring-2 ring-brand-200 scale-110' 
+                  : 'border-slate-300 hover:border-brand-400'
               )}
+              style={{
+                backgroundImage: color.swatchUrl ? `url(${color.swatchUrl})` : undefined,
+                backgroundColor: color.swatchUrl ? undefined : getColorHex(color.colorCode, color.colorName),
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
               title={`${displayName} (${color.colorCode})`}
+              aria-label={`Select ${displayName}`}
             >
-              <div className="relative">
-                <div
-                  className={clsx(
-                    'h-12 w-12 rounded-full border-2 shadow-sm transition-transform',
-                    isSelected 
-                      ? 'border-brand-500 scale-110' 
-                      : 'border-slate-200 group-hover:scale-105 group-hover:border-slate-300'
-                  )}
-                  style={{
-                    backgroundImage: color.swatchUrl ? `url(${color.swatchUrl})` : undefined,
-                    backgroundColor: color.swatchUrl ? undefined : getColorHex(color.colorCode, color.colorName),
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                  }}
-                />
-                {isSelected && (
-                  <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 shadow-sm">
-                    <svg
-                      className="h-3 w-3 text-white"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-              <span 
-                className={clsx(
-                  'line-clamp-2 text-center text-xs leading-tight',
-                  isSelected ? 'font-semibold text-brand-700' : 'text-slate-600 group-hover:text-slate-900'
-                )}
-              >
-                {displayName}
-              </span>
+              {isSelected && (
+                <div className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-500 shadow-md">
+                  <svg
+                    className="h-2.5 w-2.5 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={4}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              )}
             </button>
           );
         })}
