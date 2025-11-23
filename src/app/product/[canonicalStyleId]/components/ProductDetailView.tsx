@@ -78,7 +78,7 @@ export function ProductDetailView({ detail }: ProductDetailViewProps) {
                 colors={colorOptions}
                 selectedColorCode={selectedColorCode}
                 onSelectColor={setSelectedColorCode}
-                styleCode={currentSupplier?.supplierPartId}
+                styleCode={selectedSupplier?.supplierPartId}
               />
             </div>
           ) : validSuppliers.length === 0 ? (
