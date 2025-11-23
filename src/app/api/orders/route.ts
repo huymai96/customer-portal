@@ -1,72 +1,36 @@
+/**
+ * API Route Handler: List Orders
+ * GET /api/orders/route.ts
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
+import { getOrders } from '@/lib/orders/service';
+import { getApiErrorMessage } from '@/lib/api/client';
 
-import type { DecorationOrderRequest } from '@/lib/types';
-import type { CreateDecorationInput, CreateOrderInput } from '@/services/orders/order-service';
-import { createDraftOrder } from '@/services/orders/order-service';
-
-function mapDecorationInput(decorations?: DecorationOrderRequest['decorations']): CreateDecorationInput[] {
-  if (!decorations || decorations.length === 0) {
-    return [];
-  }
-
-  return decorations.map((decoration) => {
-    const primaryLocation = decoration.locations?.[0]?.name ?? decoration.locations?.[0]?.placementNotes ?? null;
-    return {
-      lineIndex: decoration.lineIndex,
-      method: decoration.method,
-      location: primaryLocation ?? undefined,
-      colors: decoration.colors,
-      notes: decoration.notes,
-      proofRequired: decoration.proofRequired,
-      metadata: {
-        locations: decoration.locations ?? [],
-        underbase: decoration.underbase,
-        stitchCount: decoration.stitchCount,
-        threadPalette: decoration.threadPalette,
-        ...decoration.metadata,
-      },
-      artworks: decoration.artworks?.map((artwork) => ({
-        type: artwork.type,
-        url: artwork.url,
-        metadata: artwork.metadata,
-      })),
-    };
-  });
-}
-
-function normalizePayload(payload: DecorationOrderRequest): CreateOrderInput {
-  return {
-    customerName: payload.customerName,
-    customerEmail: payload.customerEmail,
-    customerCompany: payload.customerCompany,
-    notes: payload.notes,
-    metadata: payload.metadata,
-    lines: payload.lines?.map((line) => ({
-      supplierPartId: line.supplierPartId,
-      colorCode: line.colorCode,
-      sizeCode: line.sizeCode,
-      quantity: line.quantity,
-      metadata: line.metadata,
-    })),
-    decorations: mapDecorationInput(payload.decorations),
-    artworks: payload.artworks?.map((artwork) => ({
-      type: artwork.type,
-      url: artwork.url,
-      metadata: artwork.metadata,
-    })),
-  };
-}
-
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const payload = (await request.json()) as DecorationOrderRequest;
-    const input = normalizePayload(payload);
-    const order = await createDraftOrder(input);
-    return NextResponse.json(order, { status: 201 });
+    // TODO: Add proper authentication middleware
+    
+    // Get pagination params
+    const searchParams = request.nextUrl.searchParams;
+    const page = parseInt(searchParams.get('page') || '1');
+    const pageSize = parseInt(searchParams.get('pageSize') || '20');
+
+    // Get orders from API-Docs
+    const result = await getOrders(page, pageSize);
+
+    return NextResponse.json(result);
   } catch (error) {
-    console.error('Failed to create decoration order', error);
-    const message = error instanceof Error ? error.message : 'Unable to create order';
-    return NextResponse.json({ error: message }, { status: 400 });
+    console.error('Get orders error:', error);
+    
+    const errorMessage = getApiErrorMessage(error);
+    
+    return NextResponse.json(
+      {
+        success: false,
+        error: errorMessage,
+      },
+      { status: 500 }
+    );
   }
 }
-
