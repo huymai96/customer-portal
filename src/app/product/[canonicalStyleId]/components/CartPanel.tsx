@@ -2,7 +2,9 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { SupplierSource } from '@prisma/client';
+import { useCart } from '@/contexts/CartContext';
 
 interface CartPanelProps {
   canonicalStyleId: string;
@@ -27,6 +29,8 @@ export function CartPanel({
   selectedColorName,
   allSizes,
 }: CartPanelProps) {
+  const router = useRouter();
+  const { addItem } = useCart();
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -41,7 +45,7 @@ export function CartPanel({
     setQuantities((prev) => ({ ...prev, [sizeCode]: qty }));
   };
 
-  const handleAddToCart = async () => {
+  const handleAddToCart = () => {
     if (totalPieces === 0) {
       return;
     }
@@ -50,46 +54,32 @@ export function CartPanel({
     setSuccessMessage(null);
 
     try {
-      const sizeQuantities = Object.entries(quantities)
-        .filter(([, qty]) => qty > 0)
-        .map(([sizeCode, quantity]) => ({ sizeCode, quantity }));
+      // Add each size/quantity combination as a separate cart item
+      const sizeQuantities = Object.entries(quantities).filter(([, qty]) => qty > 0);
 
-      const payload = {
-        canonicalStyleId,
-        styleNumber,
-        displayName,
-        brand: brand || '',
-        supplier,
-        supplierPartId: supplierPartId,
-        colorCode: selectedColorCode,
-        colorName: selectedColorName,
-        sizeQuantities,
-      };
-
-      const response = await fetch('/api/cart/lines', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || `HTTP ${response.status}: Failed to add to cart`;
-        throw new Error(errorMessage);
+      for (const [sizeCode, quantity] of sizeQuantities) {
+        addItem({
+          styleNumber,
+          productName: displayName,
+          supplierPartId,
+          canonicalStyleId,
+          color: selectedColorCode,
+          colorName: selectedColorName,
+          size: sizeCode,
+          quantity,
+          unitPrice: 0, // TODO: Get actual unit price from product data
+          decorations: [],
+        });
       }
 
-      const result = await response.json();
-      
       // Clear quantities and show success
       setQuantities({});
-      const message = result.success 
-        ? `Added ${totalPieces} piece${totalPieces === 1 ? '' : 's'} to cart`
-        : `Added ${totalPieces} pieces to cart`;
-      setSuccessMessage(message);
-      setTimeout(() => setSuccessMessage(null), 5000);
+      setSuccessMessage(`Added ${totalPieces} piece${totalPieces === 1 ? '' : 's'} to cart`);
       
-      // Trigger cart refresh in header
-      window.dispatchEvent(new CustomEvent('cartUpdated'));
+      // Auto-redirect to cart after 1 second
+      setTimeout(() => {
+        router.push('/cart');
+      }, 1000);
     } catch (error) {
       console.error('Add to cart error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to add to cart. Please try again.';
