@@ -14,7 +14,7 @@ const PARTNER_CODE = process.env.PORTAL_PARTNER_CODE || 'PORTAL';
 interface ApiRequestOptions {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   path: string;
-  body?: Record<string, unknown>;
+  body?: Record<string, unknown> | unknown;
   headers?: Record<string, string>;
   timeout?: number;
 }
