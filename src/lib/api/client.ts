@@ -101,9 +101,10 @@ export async function apiRequest<T>(
     }
     
     if (!response.ok) {
+      const errorData = responseData as { error?: string; code?: string };
       throw new ApiError(
-        responseData.error || `API request failed with status ${response.status}`,
-        responseData.code || 'API_ERROR',
+        errorData.error || `API request failed with status ${response.status}`,
+        errorData.code || 'API_ERROR',
         response.status
       );
     }
