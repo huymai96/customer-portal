@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { useCart } from '@/contexts/CartContext';
 import { type OrderRequest } from '@/lib/orders/service';
+import { type DecorationLocation } from '@/lib/decoration/pricing';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -97,7 +98,7 @@ export default function CheckoutPage() {
           unitPrice: item.unitPrice,
           decorations: item.decorations?.map((dec) => ({
             method: dec.method,
-            location: dec.location,
+            location: dec.location as DecorationLocation,
             description: dec.description,
             artworkUrl: dec.artworkUrl,
             colors: dec.colors,
