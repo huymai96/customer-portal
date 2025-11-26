@@ -159,6 +159,121 @@ enum CartStatus {
   ARCHIVED
 }
 
+enum QuoteStatus {
+  PENDING_APPROVAL    // Waiting for account manager review
+  APPROVED            // Account manager approved
+  REJECTED            // Account manager rejected
+  EXPIRED             // Quote expired (not acted upon)
+  CONVERTED           // Converted to order
+}
+
+// Quote submitted by customer for approval
+model Quote {
+  id                String       @id @default(uuid())
+  quoteNumber       String       @unique // e.g., QT-2024-001234
+  
+  // Customer info
+  customerId        String?      // Auth0 user ID
+  customerName      String
+  customerEmail     String
+  customerPhone     String?
+  customerCompany   String?
+  
+  // Account Manager
+  accountManagerId  String?      // Auth0 user ID of assigned AM
+  accountManagerEmail String?
+  accountManagerName String?
+  
+  // Shipping info
+  shippingAddress   Json?        // Full address object
+  inHandsDate       DateTime?
+  poNumber          String?
+  
+  // Pricing
+  subtotal          Decimal      @db.Decimal(10, 2)
+  decorationTotal   Decimal      @db.Decimal(10, 2) @default(0)
+  setupFees         Decimal      @db.Decimal(10, 2) @default(0)
+  shipping          Decimal      @db.Decimal(10, 2) @default(0)
+  tax               Decimal      @db.Decimal(10, 2) @default(0)
+  total             Decimal      @db.Decimal(10, 2)
+  
+  // Status
+  status            QuoteStatus  @default(PENDING_APPROVAL)
+  notes             String?      // Customer notes
+  internalNotes     String?      // Account manager notes
+  rejectionReason   String?      // If rejected
+  
+  // Approval tracking
+  submittedAt       DateTime     @default(now())
+  reviewedAt        DateTime?    // When AM reviewed
+  approvedAt        DateTime?    // When approved
+  expiresAt         DateTime?    // Quote expiration
+  
+  // Converted order reference
+  orderId           String?      @unique
+  
+  // Timestamps
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  // Relations
+  items             QuoteItem[]
+  approvalToken     QuoteApprovalToken?
+  
+  @@index([status])
+  @@index([customerId])
+  @@index([accountManagerId])
+  @@index([quoteNumber])
+}
+
+model QuoteItem {
+  id                String   @id @default(uuid())
+  quoteId           String
+  
+  // Product info
+  canonicalStyleId  String
+  styleNumber       String
+  productName       String
+  supplierPartId    String
+  
+  // Variant
+  colorCode         String
+  colorName         String?
+  size              String
+  quantity          Int
+  
+  // Pricing
+  unitPrice         Decimal  @db.Decimal(10, 2)
+  lineTotal         Decimal  @db.Decimal(10, 2)
+  
+  // Decoration
+  decorations       Json?    // Array of decoration objects
+  
+  // Media
+  imageUrl          String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  quote             Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  
+  @@index([quoteId])
+}
+
+// Secure token for email approval links
+model QuoteApprovalToken {
+  id        String   @id @default(uuid())
+  quoteId   String   @unique
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  
+  quote     Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  
+  @@index([token])
+}
+
 enum SupplierSource {
   SANMAR
   SSACTIVEWEAR

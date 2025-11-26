@@ -214,11 +214,15 @@ export default function CartPage() {
             </div>
 
             <Link
-              href="/checkout"
-              className="mt-6 block w-full rounded-lg bg-blue-600 px-6 py-3 text-center text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              href="/quote/submit"
+              className="mt-6 block w-full rounded-lg bg-emerald-600 px-6 py-3 text-center text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
             >
-              Proceed to Checkout
+              Submit for Approval
             </Link>
+            
+            <p className="mt-3 text-center text-xs text-slate-500">
+              Your quote will be sent to your account manager for approval
+            </p>
 
             <Link
               href="/search"
