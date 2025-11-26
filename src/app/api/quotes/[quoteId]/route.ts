@@ -5,17 +5,18 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth0 } from '@/lib/auth0';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { getQuoteById } from '@/lib/quotes/service';
+import { isStaffUser } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ quoteId: string }> }
 ) {
   try {
-    const session = await auth0.getSession();
+    const { userId } = await auth();
     
-    if (!session?.user) {
+    if (!userId) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
@@ -33,16 +34,15 @@ export async function GET(
     }
     
     // Check if user has access to this quote
-    const userEmail = session.user.email as string;
+    const user = await currentUser();
+    const userEmail = user?.emailAddresses[0]?.emailAddress || '';
     const isCustomer = quote.customerEmail === userEmail;
     const isAccountManager = quote.accountManagerEmail === userEmail;
     
-    // For now, allow access if user is customer or account manager
-    // In production, add proper role-based access control
+    // Allow access if user is customer, account manager, or staff
     if (!isCustomer && !isAccountManager) {
-      // Allow staff/admin access (check role from Auth0)
-      const userRoles = (session.user['https://promosink.com/roles'] as string[]) || [];
-      if (!userRoles.includes('admin') && !userRoles.includes('staff')) {
+      const isStaff = await isStaffUser();
+      if (!isStaff) {
         return NextResponse.json(
           { success: false, error: 'Access denied' },
           { status: 403 }
@@ -97,7 +97,7 @@ export async function GET(
         },
         
         notes: quote.notes,
-        internalNotes: isAccountManager ? quote.internalNotes : undefined,
+        internalNotes: (isAccountManager || await isStaffUser()) ? quote.internalNotes : undefined,
         rejectionReason: quote.rejectionReason,
         
         submittedAt: quote.submittedAt,

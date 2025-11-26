@@ -10,24 +10,32 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@auth0/nextjs-auth0/client';
+import { useUser, SignInButton } from '@clerk/nextjs';
 import { useCart } from '@/contexts/CartContext';
 import { type OrderRequest } from '@/lib/orders/service';
 import { type DecorationLocation } from '@/lib/decoration/pricing';
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { user, isLoading: userLoading } = useUser();
+  const { user, isLoaded: userLoaded } = useUser();
   const { items, summary, clearCart } = useCart();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Customer Info
-  const [customerName, setCustomerName] = useState(user?.name || '');
-  const [customerEmail, setCustomerEmail] = useState(user?.email || '');
+  const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+
+  // Populate user info when available
+  useEffect(() => {
+    if (user) {
+      setCustomerName(`${user.firstName || ''} ${user.lastName || ''}`.trim() || '');
+      setCustomerEmail(user.emailAddresses[0]?.emailAddress || '');
+    }
+  }, [user]);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerCompany, setCustomerCompany] = useState('');
 
@@ -47,10 +55,21 @@ export default function CheckoutPage() {
   const [inHandsDate, setInHandsDate] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Redirect if not logged in
-  if (!userLoading && !user) {
-    router.push('/api/auth/login');
-    return null;
+  // Show sign-in prompt if not logged in
+  if (userLoaded && !user) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16 text-center">
+        <h1 className="text-3xl font-bold text-slate-900">Sign In Required</h1>
+        <p className="mt-4 text-lg text-slate-600">
+          Please sign in to complete checkout
+        </p>
+        <SignInButton mode="modal">
+          <button className="mt-6 inline-block rounded-lg bg-blue-600 px-6 py-3 text-white hover:bg-blue-700">
+            Sign In
+          </button>
+        </SignInButton>
+      </div>
+    );
   }
 
   // Redirect if cart is empty

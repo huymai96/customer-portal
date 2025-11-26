@@ -8,7 +8,7 @@
 
 import React, { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@auth0/nextjs-auth0/client';
+import { useUser, SignInButton } from '@clerk/nextjs';
 import Link from 'next/link';
 
 interface QuoteItem {
@@ -73,7 +73,7 @@ interface Quote {
 export default function QuoteReviewPage({ params }: { params: Promise<{ quoteId: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
-  const { user, isLoading: userLoading } = useUser();
+  const { user, isLoaded: userLoaded } = useUser();
   
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
@@ -170,7 +170,7 @@ export default function QuoteReviewPage({ params }: { params: Promise<{ quoteId:
     }
   };
 
-  if (userLoading || loading) {
+  if (!userLoaded || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-600 border-t-transparent"></div>
@@ -182,9 +182,11 @@ export default function QuoteReviewPage({ params }: { params: Promise<{ quoteId:
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
         <h1 className="text-2xl font-bold text-slate-900">Access Denied</h1>
-        <Link href="/api/auth/login" className="mt-6 inline-block rounded-lg bg-blue-600 px-6 py-3 text-white">
-          Log In
-        </Link>
+        <SignInButton mode="modal">
+          <button className="mt-6 inline-block rounded-lg bg-blue-600 px-6 py-3 text-white">
+            Sign In
+          </button>
+        </SignInButton>
       </div>
     );
   }

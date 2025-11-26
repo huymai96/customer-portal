@@ -22,13 +22,11 @@
     "ingest:sanmar:epdd": "tsx scripts/ingest-sanmar-epdd.ts",
     "ingest:sanmar:inventory": "tsx scripts/ingest-sanmar-inventory.ts",
     "sync:sanmar:full": "tsx scripts/sync-sanmar-full-catalog-ftp.ts",
-    "ingest:style": "tsx scripts/ingest-style.ts",
-    "test:smoke": "tsx scripts/run-smoke-tests.ts",
     "seed:canonical": "tsx scripts/seed-canonical-styles.ts --apply",
     "link:style": "tsx scripts/link-style.ts"
   },
   "dependencies": {
-    "@auth0/nextjs-auth0": "^4.12.0",
+    "@clerk/nextjs": "^6.35.5",
     "@googlemaps/js-api-loader": "^1.16.8",
     "@heroicons/react": "^2.1.5",
     "@prisma/client": "^6.19.0",

@@ -6,16 +6,16 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth0 } from '@/lib/auth0';
+import { auth } from '@clerk/nextjs/server';
 import { createQuote, type CreateQuoteInput } from '@/lib/quotes/service';
 import { sendQuoteSubmittedEmail, sendQuoteApprovalRequestEmail } from '@/lib/email/quote-emails';
 
 export async function POST(request: NextRequest) {
   try {
     // Get user session
-    const session = await auth0.getSession();
+    const { userId } = await auth();
     
-    if (!session?.user) {
+    if (!userId) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }

@@ -6,23 +6,24 @@
  */
 
 import { NextResponse } from 'next/server';
-import { auth0 } from '@/lib/auth0';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { getPendingQuotes } from '@/lib/quotes/service';
+import { isAdminUser } from '@/lib/auth';
 
 export async function GET() {
   try {
-    const session = await auth0.getSession();
+    const { userId } = await auth();
     
-    if (!session?.user) {
+    if (!userId) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
       );
     }
     
-    const userEmail = session.user.email as string;
-    const userRoles = (session.user['https://promosink.com/roles'] as string[]) || [];
-    const isAdmin = userRoles.includes('admin') || userRoles.includes('staff');
+    const user = await currentUser();
+    const userEmail = user?.emailAddresses[0]?.emailAddress || '';
+    const isAdmin = await isAdminUser();
     
     // If admin, get all pending quotes; otherwise, only assigned ones
     const quotes = await getPendingQuotes(isAdmin ? undefined : userEmail);

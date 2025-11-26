@@ -8,13 +8,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@auth0/nextjs-auth0/client';
+import { useUser, SignInButton } from '@clerk/nextjs';
 import { useCart } from '@/contexts/CartContext';
 import Link from 'next/link';
 
 export default function QuoteSubmitPage() {
   const router = useRouter();
-  const { user, isLoading: userLoading } = useUser();
+  const { user, isLoaded: userLoaded } = useUser();
   const { items, summary, clearCart } = useCart();
 
   const [loading, setLoading] = useState(false);
@@ -25,6 +25,10 @@ export default function QuoteSubmitPage() {
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerCompany, setCustomerCompany] = useState('');
+
+  // Account Manager
+  const [accountManagerEmail, setAccountManagerEmail] = useState('');
+  const [amEmailError, setAmEmailError] = useState<string | null>(null);
 
   // Shipping Address
   const [shipName, setShipName] = useState('');
@@ -45,19 +49,45 @@ export default function QuoteSubmitPage() {
   // Populate user info when available
   useEffect(() => {
     if (user) {
-      setCustomerName(user.name || '');
-      setCustomerEmail(user.email || '');
+      setCustomerName(`${user.firstName || ''} ${user.lastName || ''}`.trim() || '');
+      setCustomerEmail(user.emailAddresses[0]?.emailAddress || '');
     }
   }, [user]);
 
-  // Redirect if not logged in
-  if (!userLoading && !user) {
-    router.push('/api/auth/login');
-    return null;
+  // Validate account manager email domain
+  const validateAmEmail = (email: string) => {
+    if (!email) {
+      setAmEmailError(null);
+      return true;
+    }
+    const domain = email.split('@')[1]?.toLowerCase();
+    if (domain !== 'promosink.com' && domain !== 'promosinkwall-e.com') {
+      setAmEmailError('Account manager email must be @promosink.com');
+      return false;
+    }
+    setAmEmailError(null);
+    return true;
+  };
+
+  // Show sign-in prompt if not logged in
+  if (userLoaded && !user) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16 text-center">
+        <h1 className="text-3xl font-bold text-slate-900">Sign In Required</h1>
+        <p className="mt-4 text-lg text-slate-600">
+          Please sign in to submit a quote request
+        </p>
+        <SignInButton mode="modal">
+          <button className="mt-6 inline-block rounded-lg bg-emerald-600 px-6 py-3 text-white hover:bg-emerald-700">
+            Sign In
+          </button>
+        </SignInButton>
+      </div>
+    );
   }
 
   // Redirect if cart is empty
-  if (!userLoading && items.length === 0) {
+  if (userLoaded && items.length === 0) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="text-center">
@@ -135,7 +165,14 @@ export default function QuoteSubmitPage() {
         poNumber: poNumber || undefined,
         inHandsDate: inHandsDate || undefined,
         notes: notes || undefined,
+        accountManagerEmail: accountManagerEmail || undefined,
       };
+
+      // Validate AM email if provided
+      if (accountManagerEmail && !validateAmEmail(accountManagerEmail)) {
+        setLoading(false);
+        return;
+      }
 
       const response = await fetch('/api/quotes/submit', {
         method: 'POST',
@@ -161,10 +198,10 @@ export default function QuoteSubmitPage() {
     }
   };
 
-  if (userLoading) {
+  if (!userLoaded) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-600 border-t-transparent"></div>
       </div>
     );
   }
@@ -230,6 +267,40 @@ export default function QuoteSubmitPage() {
                   className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Account Manager */}
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900 mb-1">Account Manager</h2>
+            <p className="text-sm text-slate-600 mb-4">
+              Enter your Promos Ink account manager&apos;s email address
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Account Manager Email
+              </label>
+              <input
+                type="email"
+                value={accountManagerEmail}
+                onChange={(e) => {
+                  setAccountManagerEmail(e.target.value);
+                  if (e.target.value) validateAmEmail(e.target.value);
+                }}
+                onBlur={(e) => validateAmEmail(e.target.value)}
+                className={`w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 ${
+                  amEmailError
+                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                    : 'border-slate-300 focus:border-emerald-500 focus:ring-emerald-500'
+                }`}
+                placeholder="name@promosink.com"
+              />
+              {amEmailError && (
+                <p className="mt-1 text-sm text-red-600">{amEmailError}</p>
+              )}
+              <p className="mt-2 text-xs text-slate-500">
+                Don&apos;t have an account manager yet? Leave blank and we&apos;ll assign one to your quote.
+              </p>
             </div>
           </div>
 

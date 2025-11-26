@@ -6,18 +6,19 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth0 } from '@/lib/auth0';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { rejectQuote, getQuoteById } from '@/lib/quotes/service';
 import { sendQuoteRejectedEmail } from '@/lib/email/quote-emails';
+import { isStaffUser } from '@/lib/auth';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ quoteId: string }> }
 ) {
   try {
-    const session = await auth0.getSession();
+    const { userId } = await auth();
     
-    if (!session?.user) {
+    if (!userId) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
@@ -46,13 +47,13 @@ export async function POST(
     }
     
     // Check if user is authorized to reject
-    const userEmail = session.user.email as string;
-    const userName = session.user.name as string;
+    const user = await currentUser();
+    const userEmail = user?.emailAddresses[0]?.emailAddress || '';
+    const userName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || userEmail;
     const isAccountManager = existingQuote.accountManagerEmail === userEmail;
-    const userRoles = (session.user['https://promosink.com/roles'] as string[]) || [];
-    const isAdmin = userRoles.includes('admin') || userRoles.includes('staff');
+    const isStaff = await isStaffUser();
     
-    if (!isAccountManager && !isAdmin) {
+    if (!isAccountManager && !isStaff) {
       return NextResponse.json(
         { success: false, error: 'Not authorized to reject this quote' },
         { status: 403 }
@@ -63,7 +64,7 @@ export async function POST(
     const quote = await rejectQuote(
       quoteId,
       body.reason,
-      session.user.sub as string,
+      userId,
       userName
     );
     

@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-
-import { auth0 } from "@/lib/auth0";
+import { auth } from "@clerk/nextjs/server";
+import { SignInButton } from "@clerk/nextjs";
 
 interface LoginPageProps {
   searchParams?: Promise<{
     redirect?: string;
     error?: string;
     error_description?: string;
-    organization?: string;
   }>;
 }
 
@@ -18,18 +17,10 @@ export default async function PortalLoginPage({ searchParams }: LoginPageProps) 
   const error = resolvedParams?.error;
   const errorDescription = resolvedParams?.error_description;
 
-  const session = await auth0.getSession();
-  if (session) {
+  const { userId } = await auth();
+  if (userId) {
     redirect(redirectTo);
   }
-
-  const params = new URLSearchParams();
-  params.set("returnTo", redirectTo);
-  if (resolvedParams?.organization) {
-    params.set("organization", resolvedParams.organization);
-  }
-
-  const loginHref = `/auth/login?${params.toString()}`;
 
   let errorMessage: string | null = null;
   if (error === "access_denied") {
@@ -44,7 +35,7 @@ export default async function PortalLoginPage({ searchParams }: LoginPageProps) 
         <div>
           <h1 className="text-2xl font-semibold text-white">Customer Portal Access</h1>
           <p className="mt-2 text-sm text-slate-300">
-            Sign in with your Promos Ink SSO credentials to access live inventory, quotes, and billing tools.
+            Sign in to access live inventory, quotes, and order tracking.
           </p>
         </div>
 
@@ -55,12 +46,15 @@ export default async function PortalLoginPage({ searchParams }: LoginPageProps) 
         ) : null}
 
         <div className="space-y-4">
-          <a
-            href={loginHref}
-            className="flex w-full items-center justify-center gap-2 rounded-md bg-blue-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-600"
+          <SignInButton 
+            mode="modal"
+            fallbackRedirectUrl={redirectTo}
           >
-            Continue with Auth0 SSO
-          </a>
+            <button className="flex w-full items-center justify-center gap-2 rounded-md bg-blue-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-600">
+              Sign In
+            </button>
+          </SignInButton>
+          
           <p className="text-xs text-slate-400">
             Need portal access? <Link href="/portal/request-access" className="text-blue-300 hover:text-blue-200">Request approval</Link> and our team will review your account.
           </p>
@@ -83,5 +77,3 @@ export default async function PortalLoginPage({ searchParams }: LoginPageProps) 
     </main>
   );
 }
-
-

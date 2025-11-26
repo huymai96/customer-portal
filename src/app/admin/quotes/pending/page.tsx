@@ -7,7 +7,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useUser } from '@auth0/nextjs-auth0/client';
+import { useUser, SignInButton } from '@clerk/nextjs';
 import Link from 'next/link';
 
 interface QuotePreview {
@@ -33,7 +33,7 @@ interface QuotePreview {
 }
 
 export default function PendingQuotesPage() {
-  const { user, isLoading: userLoading } = useUser();
+  const { user, isLoaded: userLoaded } = useUser();
   const [quotes, setQuotes] = useState<QuotePreview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +62,7 @@ export default function PendingQuotesPage() {
     }
   }, [user]);
 
-  if (userLoading || loading) {
+  if (!userLoaded || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-600 border-t-transparent"></div>
@@ -75,9 +75,11 @@ export default function PendingQuotesPage() {
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
         <h1 className="text-2xl font-bold text-slate-900">Access Denied</h1>
         <p className="mt-4 text-slate-600">Please log in to access this page.</p>
-        <Link href="/api/auth/login" className="mt-6 inline-block rounded-lg bg-blue-600 px-6 py-3 text-white hover:bg-blue-700">
-          Log In
-        </Link>
+        <SignInButton mode="modal">
+          <button className="mt-6 inline-block rounded-lg bg-blue-600 px-6 py-3 text-white hover:bg-blue-700">
+            Sign In
+          </button>
+        </SignInButton>
       </div>
     );
   }

@@ -1,46 +1,58 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
 
-import { auth0 } from "@/lib/auth0";
+// Public routes - no auth required
+const isPublicRoute = createRouteMatcher([
+  '/',
+  '/search(.*)',
+  '/product(.*)',
+  '/category(.*)',
+  '/api/products(.*)',
+  '/api/health(.*)',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+]);
 
-function buildLoginRedirectUrl(request: NextRequest) {
-  const loginUrl = new URL("/portal/login", request.url);
-  const pathname = request.nextUrl.pathname;
-  const search = request.nextUrl.search;
-  if (pathname && pathname !== "/portal/login") {
-    loginUrl.searchParams.set("redirect", `${pathname}${search}`.replace(/^\/+/, "/"));
-  }
-  const org = request.nextUrl.searchParams.get("organization");
-  if (org) {
-    loginUrl.searchParams.set("organization", org);
-  }
-  return loginUrl;
-}
+// Staff-only routes - require staff/admin role
+const isStaffRoute = createRouteMatcher([
+  '/admin(.*)',
+  '/api/quotes/pending(.*)',
+]);
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  if (pathname === "/portal/login" || pathname === "/portal/request-access") {
+export default clerkMiddleware(async (auth, req) => {
+  const { userId, sessionClaims } = await auth();
+  
+  // Allow public routes
+  if (isPublicRoute(req)) {
     return NextResponse.next();
   }
-
-  if (pathname.startsWith("/portal/api/request-access")) {
-    return NextResponse.next();
+  
+  // Require auth for all other routes
+  if (!userId) {
+    const signInUrl = new URL('/sign-in', req.url);
+    signInUrl.searchParams.set('redirect_url', req.url);
+    return NextResponse.redirect(signInUrl);
   }
-
-  if (pathname.startsWith("/portal")) {
-    const session = await auth0.getSession(request);
-    if (!session) {
-      return NextResponse.redirect(buildLoginRedirectUrl(request));
+  
+  // Check staff routes
+  if (isStaffRoute(req)) {
+    const userRole = (sessionClaims?.metadata as { role?: string })?.role;
+    const isStaff = userRole === 'staff' || userRole === 'admin';
+    
+    if (!isStaff) {
+      // Redirect non-staff to portal home
+      return NextResponse.redirect(new URL('/portal', req.url));
     }
-    return auth0.middleware(request);
   }
-
+  
   return NextResponse.next();
-}
+});
 
 export const config = {
-  matcher: ["/portal/:path*"],
+  matcher: [
+    // Skip Next.js internals and static files
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // Always run for API routes
+    '/(api|trpc)(.*)',
+  ],
 };
-
-
